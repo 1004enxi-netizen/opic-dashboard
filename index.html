@@ -594,7 +594,7 @@
 <footer>
   <div id="footInfo"></div>
   <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
-  <div>빌드 2026-11-19 08:19</div>
+  <div>빌드 2026-11-19 08:33</div>
 </footer>
 
 <script>
@@ -1957,13 +1957,15 @@ function renderSpeak(q) {
   }
 
   html += '<div class="mic-row">';
-  html += '<button class="btn mic" data-gact="mic"' + (SR ? "" : " disabled") + ">🎤 " + (st.listening ? "듣는 중…" : "말하기") + "</button>";
+  html += '<button class="btn mic' + (st.listening ? " primary" : "") + '" data-gact="mic"' + (SR ? "" : " disabled") + ">" + (st.listening ? "✅ 다 말했어요 (채점하기)" : "🎤 말하기 시작") + "</button>";
   html += '<button class="btn" type="button" data-tts="' + esc(q.answer) + '" data-ttsl="' + esc(q.lang) + '"><span class="ic">🔊</span> 발음 듣기</button>';
   html += '<button class="btn hint" data-gact="hint">💡 힌트 보기</button>';
   html += "</div>";
 
-  if (st.heard) {
-    html += '<div class="heard show">인식된 문장: <b>' + esc(st.heard) + "</b></div>";
+  if (st.heard || st.listening) {
+    html += '<div class="heard show" id="speakHeardBox">' +
+      (st.listening ? "🎙️ 듣는 중… " : "인식된 문장: ") +
+      "<b>" + esc(st.heard || "(말씀을 기다리고 있어요…)") + "</b></div>";
   }
 
   html += '<div class="manual">';
@@ -2103,6 +2105,7 @@ document.getElementById("gameBody").addEventListener("click", function (ev) {
     return;
   }
   if (act === "next") {
+    if (st.listening && recog) { st.listening = false; try { recog.stop(); } catch (e) {} }
     session.i += 1;
     session.st = freshState();
     if (session.i >= session.questions.length) session.finished = true;
@@ -2136,59 +2139,92 @@ document.getElementById("gameBody").addEventListener("click", function (ev) {
   }
   if (act === "mic") {
     if (!SR) return;
-    if (st.listening && recog) { try { recog.stop(); } catch (e) {} return; }
+    if (st.listening) {
+      st.listening = false;
+      if (recog) { try { recog.stop(); } catch (e) {} }
+      const finalText = (st.heard || "").trim();
+      const r = judgeSpeak(q, finalText);
+      if (r.ok) {
+        if (!st.answered) session.solved += 1;
+        st.answered = true;
+        st.msg = r.msg; st.msgKind = "ok";
+      } else {
+        markWrong(q);
+        st.msg = r.msg + " (오답 " + Math.min(st.qWrong, 3) + "/3)"; st.msgKind = "no";
+      }
+      renderGame();
+      return;
+    }
     try {
       if (window.speechSynthesis) window.speechSynthesis.cancel();
-      recog = new SR();
-      recog.lang = (LANGS[q.lang] || {}).code || "en-US";
-      recog.interimResults = false;
-      recog.maxAlternatives = 3;
       st.listening = true;
-      st.msg = "듣고 있어요. 문장을 말해 보세요…";
+      st.prevFinal = "";
+      st.curSessionFinal = "";
+      st.heard = "";
+      st.msg = "천천히 말씀하세요. 중간에 멈추셔도 기다립니다! 다 말하시면 ‘다 말했어요’를 눌러 주세요.";
       st.msgKind = "info";
       renderGame();
-      recog.onresult = function (e) {
-        let best = "";
-        let bestRes = null;
-        try {
-          const res = e.results[e.results.length - 1];
-          const cur0 = curQ();
-          for (let k = 0; k < res.length; k++) {
-            const cand = res[k] ? res[k].transcript : "";
-            if (!cand) continue;
-            if (!cur0) { best = cand; break; }
-            const jr = judgeSpeak(cur0, cand);
-            if (!bestRes || jr.ratio > bestRes.ratio) { best = cand; bestRes = jr; }
+
+      const startRecog = function () {
+        if (!st.listening) return;
+        recog = new SR();
+        recog.lang = (LANGS[q.lang] || {}).code || "en-US";
+        recog.continuous = true;
+        recog.interimResults = true;
+        recog.maxAlternatives = 1;
+        st.curSessionFinal = "";
+        recog.onresult = function (e) {
+          if (!st.listening) return;
+          let fin = "";
+          let interim = "";
+          try {
+            for (let i = 0; i < e.results.length; i++) {
+              const res = e.results[i];
+              const tr = res[0] ? res[0].transcript : "";
+              if (res.isFinal) fin += (fin ? " " : "") + tr;
+              else interim += (interim ? " " : "") + tr;
+            }
+          } catch (err) {}
+          st.curSessionFinal = fin.trim();
+          st.heard = [st.prevFinal, st.curSessionFinal, interim.trim()].filter(Boolean).join(" ").trim();
+          const box = document.getElementById("speakHeardBox");
+          if (box) {
+            box.innerHTML = "🎙️ 듣는 중… <b>" + esc(st.heard || "(말씀을 기다리고 있어요…)") + "</b>";
           }
-        } catch (err) { best = ""; }
-        const cur = curQ();
-        st.listening = false;
-        if (!cur) return;
-        st.heard = best;
-        const r = bestRes || judgeSpeak(cur, best);
-        if (r.ok) { st.answered = true; session.solved += 1; st.msg = r.msg; st.msgKind = "ok"; }
-        else { markWrong(cur); st.msg = r.msg + " (오답 " + Math.min(st.qWrong, 3) + "/3)"; st.msgKind = "no"; }
-        renderGame();
+        };
+        recog.onerror = function (e) {
+          const code = e && e.error ? e.error : "unknown";
+          if (code === "no-speech" && st.listening) {
+            return;
+          }
+          if (code === "aborted" && !st.listening) {
+            return;
+          }
+          st.listening = false;
+          if (code === "not-allowed" || code === "service-not-allowed") {
+            st.msg = "마이크 권한이 차단되었어요(" + code + "). 웹 주소(https)나 크롬 마이크 허용이 필요합니다.";
+          } else {
+            st.msg = "음성 인식이 중단되었어요 (" + code + ").";
+          }
+          st.msgKind = "no";
+          renderGame();
+        };
+        recog.onend = function () {
+          if (st.listening) {
+            if (st.curSessionFinal) {
+              st.prevFinal = [st.prevFinal, st.curSessionFinal].filter(Boolean).join(" ").trim();
+              st.curSessionFinal = "";
+            }
+            setTimeout(function () {
+              if (st.listening) {
+                try { startRecog(); } catch (err) { st.listening = false; renderGame(); }
+              }
+            }, 150);
+          }
+        };
+        recog.start();
       };
-      recog.onerror = function (e) {
-        st.listening = false;
-        const code = e && e.error ? e.error : "unknown";
-        if (code === "not-allowed" || code === "service-not-allowed") {
-          st.msg = "마이크 권한이 차단되었어요(" + code + "). 로컬 파일 대신 웹 주소(https)나 크롬 마이크 허용이 필요합니다.";
-        } else if (code === "no-speech") {
-          st.msg = "목소리가 들리지 않았어요. 마이크 버튼을 다시 누르고 바로 말해 보세요.";
-        } else {
-          st.msg = "음성 인식이 되지 않았어요 (" + code + "). 직접 입력으로 채점해 주세요.";
-        }
-        st.msgKind = "no";
-        renderGame();
-      };
-      recog.onend = function () {
-        st.listening = false;
-        const f = document.querySelector("#gameBody .btn.mic");
-        if (f) f.textContent = "🎤 말하기";
-      };
-      recog.start();
+      startRecog();
       return;
     } catch (err) {
       st.listening = false;
