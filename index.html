@@ -594,7 +594,7 @@
 <footer>
   <div id="footInfo"></div>
   <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
-  <div>빌드 2026-11-19 08:48</div>
+  <div>빌드 2026-11-19 08:55</div>
 </footer>
 
 <script>
@@ -1962,8 +1962,9 @@ function renderSpeak(q) {
     html += '<div class="warnbox show">🎙️ 폰에서 다운받은 파일(<code>' + esc(location.protocol) + '</code>)로 열면 안드로이드 보안상 마이크가 차단될 수 있어요. 웹 주소(https)로 열거나 PC 크롬에서 사용하면 음성이 인식됩니다.</div>';
   }
 
+  const micLabel = st.listening ? "✅ 다 말했어요 (채점하기)" : (st.heard ? "🔁 다시 말하기" : "🎤 말하기 시작");
   html += '<div class="mic-row">';
-  html += '<button class="btn mic' + (st.listening ? " primary" : "") + '" data-gact="mic"' + (SR ? "" : " disabled") + ">" + (st.listening ? "✅ 다 말했어요 (채점하기)" : "🎤 말하기 시작") + "</button>";
+  html += '<button class="btn mic' + (st.listening ? " primary" : "") + '" data-gact="mic"' + (SR ? "" : " disabled") + ">" + micLabel + "</button>";
   html += '<button class="btn" type="button" data-tts="' + esc(q.answer) + '" data-ttsl="' + esc(q.lang) + '"><span class="ic">🔊</span> 발음 듣기</button>';
   html += '<button class="btn hint" data-gact="hint">💡 힌트 보기</button>';
   html += "</div>";
