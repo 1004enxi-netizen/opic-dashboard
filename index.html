@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>OPIc 누적 학습 대시보드</title>
+<style>
+  :root{
+    --bg:#f4f5f9; --card:#fff; --ink:#1b1f2a; --muted:#6b7280; --line:#e6e8f0;
+    --accent:#4f46e5; --accent-soft:#eef0ff;
+    --en:#1D4ED8; --zh:#DC2626; --ja:#059669;
+    --ok:#059669; --warn:#b45309; --bad:#dc2626;
+    --radius:16px;
+    --shadow:0 2px 10px rgba(20,25,50,.06), 0 1px 2px rgba(20,25,50,.04);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:15px; line-height:1.65;
+  }
+  body.modal-open{overflow:hidden}
+  button{font:inherit; cursor:pointer}
+  h1,h2,h3,h4,p,ul{margin:0}
+  ul{padding:0; list-style:none}
+
+  /* ---------- 상단 요약 ---------- */
+  .hero{background:linear-gradient(135deg,#1e1b4b 0%,#312e81 45%,#4338ca 100%); color:#fff; padding:30px 20px 26px}
+  .hero-inner{max-width:1080px; margin:0 auto}
+  .hero h1{font-size:25px; letter-spacing:-.02em; margin-bottom:6px}
+  .hero-sub{color:#c7c9f5; font-size:13.5px}
+  .stats{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:20px}
+  .stat{background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.15); border-radius:12px; padding:10px 12px}
+  .stat .num{font-size:20px; font-weight:700; line-height:1.25; letter-spacing:-.01em}
+  .stat .lbl{font-size:11.5px; color:#c7c9f5; margin-top:1px}
+  .overall{margin-top:16px}
+  .overall-head{display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:#dcdcf9; margin-bottom:7px}
+  .overall-head strong{font-size:15px; color:#fff}
+  .bar{height:10px; border-radius:999px; background:rgba(255,255,255,.18); overflow:hidden}
+  .bar-fill{height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,#34d399,#a7f3d0); transition:width .35s ease}
+
+  /* ---------- 뷰 내비게이션 ---------- */
+  .viewnav{position:sticky; top:0; z-index:40; background:rgba(244,245,249,.95); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); padding:10px 16px}
+  .viewnav-inner{max-width:1080px; margin:0 auto; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none}
+  .viewnav-inner::-webkit-scrollbar{display:none}
+  .vtab{border:1px solid var(--line); background:#fff; color:#4b5563; border-radius:999px; padding:8px 15px; white-space:nowrap; font-size:14px; font-weight:700; transition:.15s}
+  .vtab:hover{border-color:#c7cbe0}
+  .vtab.active{background:var(--accent); border-color:var(--accent); color:#fff}
+  .vtab .cnt{font-weight:500; color:#9ca3af; margin-left:5px; font-size:12px}
+  .vtab.active .cnt{color:#dcdcf9}
+
+  main{max-width:1080px; margin:0 auto; padding:20px 16px 70px}
+  .view{display:none}
+  .view.active{display:block}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 18px 16px}
+  .panel + .panel{margin-top:18px}
+  .panel-head{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px}
+  .panel-head h2{font-size:17px; letter-spacing:-.02em}
+  .panel-head p{font-size:12.5px; color:var(--muted)}
+  .legend{display:flex; flex-wrap:wrap; gap:12px; font-size:12.5px; color:#4b5563}
+  .legend span{display:inline-flex; align-items:center; gap:5px}
+  .dot{width:9px; height:9px; border-radius:50%; display:inline-block}
+  .dot.en{background:var(--en)} .dot.zh{background:var(--zh)} .dot.ja{background:var(--ja)}
+
+  /* ---------- 달력 ---------- */
+  .cal-nav{display:flex; gap:6px; align-items:center}
+  .cal-nav button{border:1px solid var(--line); background:#fff; color:#374151; border-radius:9px; padding:6px 11px; font-size:13px; font-weight:600}
+  .cal-nav button:hover{border-color:#c7cbe0}
+  .cal-month{font-size:18px; font-weight:800; letter-spacing:-.02em; min-width:128px}
+  .cal-month small{display:block; font-size:11.5px; font-weight:600; color:var(--muted); letter-spacing:0}
+  .cal-dows{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px}
+  .cal-dow{text-align:center; font-size:11.5px; font-weight:700; color:#8b90a3; padding:2px 0}
+  .cal-dow.sun{color:var(--zh)} .cal-dow.sat{color:var(--en)}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px}
+  .cal-cell{background:#fff; border:1px solid var(--line); border-radius:12px; min-height:106px; padding:6px 5px 7px; display:flex; flex-direction:column; gap:3px; min-width:0}
+  .cal-cell.out{background:#fafafd; border-style:dashed; opacity:.62}
+  .cal-cell.is-today{border-color:var(--accent); box-shadow:0 0 0 2px #e2e0ff inset}
+  .cal-cell.has-lessons{cursor:default}
+  .cal-num{display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 4px; border:0; background:transparent; border-radius:8px; font-size:12.5px; font-weight:800; color:#4b5563; align-self:flex-start}
+  .cal-num:hover{background:#f0f1f8}
+  .cal-cell.is-today .cal-num{background:var(--accent); color:#fff}
+  .cal-chips{display:flex; flex-direction:column; gap:3px; min-width:0}
+  .ctag{display:block; width:100%; text-align:left; border:0; border-radius:6px; padding:2px 5px; font-size:11.5px; font-weight:700; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:#eef3ff; color:var(--en)}
+  .ctag:hover{filter:brightness(.96)}
+  .ctag.zh{background:#fff0ef; color:var(--zh)}
+  .ctag.ja{background:#eafaf1; color:var(--ja)}
+  .ctag.more{background:#f4f5fa; color:#6b7280; font-weight:600}
+  .cal-list{margin-top:16px; border-top:1px solid var(--line); padding-top:12px}
+  .cal-list-title{font-size:14px; letter-spacing:-.01em; margin-bottom:10px}
+  .cal-list-title span{font-size:11.5px; font-weight:600; color:var(--muted); margin-left:6px}
+  .cld{display:flex; flex-wrap:wrap; gap:6px 10px; align-items:flex-start; padding:7px 0; border-bottom:1px dashed #f1f2f8}
+  .cld:last-child{border-bottom:0}
+  .cld-date{flex:0 0 auto; width:118px; font-size:12.5px; font-weight:800; color:#4b5563; padding-top:4px}
+  .cld-topics{flex:1 1 220px; min-width:0; display:flex; flex-wrap:wrap; gap:5px}
+  .ctag-lg{display:inline-block; width:auto; max-width:100%; font-size:12.5px; font-weight:700; padding:3px 9px; border-radius:8px}
+  .cal-dots{display:none; gap:3px; flex-wrap:wrap; border:0; background:transparent; padding:2px 0 1px; justify-content:flex-start}
+  .cdot{width:7px; height:7px; border-radius:50%}
+  .cdot.en{background:var(--en)} .cdot.zh{background:var(--zh)} .cdot.ja{background:var(--ja)}
+
+  /* ---------- 주제 누적 ---------- */
+  .topic-sec{margin-bottom:16px}
+  .topic-sec:last-child{margin-bottom:0}
+  .topic-sec-head{display:flex; flex-wrap:wrap; gap:8px; align-items:baseline; justify-content:space-between; padding:10px 12px; border-radius:12px; background:#f7f8fd; border:1px solid var(--line); margin-bottom:10px}
+  .topic-sec-head h3{font-size:15.5px; letter-spacing:-.01em}
+  .topic-sec-head h3 .dot{margin-right:6px}
+  .topic-sec-head p{font-size:12px; color:var(--muted)}
+  .topic-row{display:flex; flex-wrap:wrap; gap:8px; align-items:flex-start; width:100%; text-align:left; border:1px solid var(--line); background:#fff; border-radius:11px; padding:9px 12px; margin-bottom:7px}
+  .topic-row:hover{border-color:#c7cbe0; background:#fcfcff}
+  .topic-row .tname{font-size:14.5px; font-weight:700; letter-spacing:-.01em; flex:1 1 220px; min-width:0}
+  .topic-row .tmeta{font-size:12px; color:var(--muted); flex:0 0 auto}
+  .topic-row .tmeta b{color:#374151}
+  .topic-row .tlang{font-size:11px; font-weight:800; border-radius:6px; padding:1px 6px; background:#eef3ff; color:var(--en); flex:0 0 auto}
+  .topic-row .tlang.zh{background:#fff0ef; color:var(--zh)}
+  .topic-row .tlang.ja{background:#eafaf1; color:var(--ja)}
+  .rate{display:inline-block; width:44px; height:5px; border-radius:999px; background:#eef0f7; overflow:hidden; vertical-align:middle; margin-left:4px}
+  .rate > span{display:block; height:100%; background:var(--ok)}
+  .sec-empty{font-size:13px; color:var(--muted); padding:6px 12px 10px}
+
+  /* ---------- 수업 목록 (기존) ---------- */
+  .listbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:16px}
+  .tabs{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{border:1px solid var(--line); background:#fff; color:#4b5563; border-radius:999px; padding:7px 14px; white-space:nowrap; font-size:13.5px; font-weight:600; transition:.15s}
+  .tab .cnt{font-weight:500; color:#9ca3af; margin-left:4px; font-size:12px}
+  .tab:hover{border-color:#c7cbe0}
+  .tab.active{background:var(--accent); border-color:var(--accent); color:#fff}
+  .tab.active .cnt{color:#dcdcf9}
+  .controls{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .search{display:flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:6px 10px}
+  .search span{font-size:13px; opacity:.6}
+  .search input{border:0; outline:0; font:inherit; font-size:13.5px; width:190px; background:transparent; color:var(--ink)}
+  .switch{display:inline-flex; align-items:center; gap:7px; font-size:13.5px; font-weight:600; color:#374151; background:#fff; border:1px solid var(--line); border-radius:10px; padding:7px 11px; cursor:pointer; user-select:none}
+  .switch input{width:15px; height:15px; accent-color:var(--accent); margin:0}
+  .ghost{background:#fff; border:1px solid var(--line); color:#374151; border-radius:10px; padding:7px 12px; font-size:13.5px; font-weight:600}
+  .ghost:hover{border-color:#c7cbe0}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-left:5px solid var(--c,var(--accent));
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 20px 6px; margin-bottom:18px;
+  }
+  .card[data-lang="en"]{--c:var(--en)}
+  .card[data-lang="zh"]{--c:var(--zh)}
+  .card[data-lang="ja"]{--c:var(--ja)}
+  .meta{display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin-bottom:6px}
+  .date{font-weight:700; font-size:14px; letter-spacing:-.01em}
+  .wd{color:var(--muted); font-weight:500}
+  .badge{font-size:12px; font-weight:700; border-radius:999px; padding:2px 9px; background:#eef3ff; color:var(--en)}
+  .card[data-lang="zh"] .badge{background:#fff0ef; color:var(--zh)}
+  .card[data-lang="ja"] .badge{background:#eafaf1; color:var(--ja)}
+  .level{font-size:12px; font-weight:700; color:#4b5563; background:#f3f4f8; border-radius:6px; padding:2px 8px}
+  .session{font-size:12px; color:var(--muted)}
+  .card-title{font-size:18px; line-height:1.4; letter-spacing:-.02em; margin:4px 0 8px}
+  .topics{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px}
+  .chip{font-size:12.5px; color:#4b5563; background:#f6f7fb; border:1px solid #eceef6; border-radius:8px; padding:2px 9px}
+
+  .answer-head{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; border-top:1px dashed var(--line); padding:10px 0 8px}
+  .answer-toggle{display:inline-flex; align-items:center; gap:7px; border:0; background:transparent; color:var(--accent); font-weight:700; font-size:14px; padding:2px 0}
+  .answer-toggle .caret{display:inline-block; transition:transform .2s; font-size:11px}
+  .answer-toggle.open .caret{transform:rotate(180deg)}
+  .answer-tools{display:flex; gap:6px}
+  .mini{border:1px solid var(--line); background:#fff; color:#4b5563; border-radius:8px; padding:4px 9px; font-size:12.5px; font-weight:600}
+  .mini:hover{border-color:#c7cbe0; color:var(--ink)}
+  .answer-wrap{display:none; padding:4px 0 12px}
+  .answer-wrap.open{display:block}
+  .ans-note{font-size:12.5px; color:var(--muted); background:#f8f9fd; border-radius:8px; padding:7px 11px; margin-bottom:12px}
+  .ans-block{margin-bottom:14px}
+  .ans-block:last-child{margin-bottom:4px}
+  .ans-block h4{font-size:13.5px; color:var(--c); margin-bottom:6px; letter-spacing:-.01em}
+  .ans-line{padding:8px 0 9px; border-bottom:1px solid #f1f2f8}
+  .ans-line:last-child{border-bottom:0}
+  .ans-text{font-size:15.5px; color:#111827}
+  .card[data-lang="zh"] .ans-text,.m-card[data-lang="zh"] .ans-text{font-size:16.5px; letter-spacing:.01em}
+  .card[data-lang="ja"] .ans-text,.m-card[data-lang="ja"] .ans-text{font-size:17px; letter-spacing:.02em}
+  .ans-reading{font-size:13px; color:#6b7280; margin-top:3px}
+  .ans-ko{font-size:13.5px; color:#4b5563; margin-top:3px}
+  .hide-reading .ans-reading{display:none}
+
+  .expr-head{display:flex; align-items:center; justify-content:space-between; gap:10px; border-top:1px dashed var(--line); margin-top:10px; padding:12px 0 6px}
+  .expr-head h4{font-size:14px; letter-spacing:-.01em; flex:1 1 auto; min-width:0}
+  .expr-progress{font-size:12.5px; font-weight:700; color:var(--muted); flex:0 0 auto}
+  .expr-progress b{color:var(--ok)}
+  .mini-bar{height:5px; border-radius:999px; background:#eef0f7; overflow:hidden}
+  .mini-bar > div{height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,#34d399,#059669); transition:width .3s}
+  .expr-list{margin:10px 0 14px}
+  .expr-item{border-bottom:1px solid #f1f2f8}
+  .expr-item:last-child{border-bottom:0}
+  .expr-item label{position:relative; display:flex; gap:10px; align-items:flex-start; padding:9px 4px; cursor:pointer; border-radius:8px}
+  .expr-item label:hover{background:#fafbff}
+  .expr-item input{position:absolute; left:4px; top:9px; opacity:0; width:19px; height:19px; margin:0}
+  .box{flex:0 0 auto; width:19px; height:19px; margin-top:3px; border:2px solid #cbd0e0; border-radius:6px; background:#fff; position:relative; transition:.15s}
+  .expr-item input:focus-visible + .box{outline:2px solid var(--accent); outline-offset:2px}
+  .expr-item input:checked + .box{background:var(--ok); border-color:var(--ok)}
+  .expr-item input:checked + .box::after{content:""; position:absolute; left:5px; top:1px; width:5px; height:10px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg)}
+  .expr-body{min-width:0; flex:1}
+  .expr-top{display:flex; flex-wrap:wrap; gap:7px; align-items:baseline}
+  .tag{font-size:11px; font-weight:700; border-radius:5px; padding:1px 6px; white-space:nowrap; letter-spacing:-.01em}
+  .tag.word{background:#eef2ff; color:#4338ca}
+  .tag.pattern{background:#ecfdf5; color:#047857}
+  .tag.correction{background:#fff7ed; color:#c2410c}
+  .tag.pronunciation{background:#f0f9ff; color:#0369a1}
+  .tag.advanced{background:#fdf2f8; color:#be185d}
+  .expr-text{font-size:14.5px; font-weight:600; color:#111827; word-break:break-word}
+  .card[data-lang="zh"] .expr-text,.m-card[data-lang="zh"] .expr-text{font-size:15.5px}
+  .card[data-lang="ja"] .expr-text,.m-card[data-lang="ja"] .expr-text{font-size:15.5px}
+  .expr-reading{display:block; font-size:12.5px; color:#8b5e34; margin-top:2px}
+  .card[data-lang="ja"] .expr-reading,.m-card[data-lang="ja"] .expr-reading{color:#0369a1}
+  .expr-ko{display:block; font-size:13px; color:#4b5563; margin-top:1px}
+  .expr-wrong{display:block; font-size:12.5px; color:#b91c1c; margin-top:3px}
+  .expr-note{display:block; font-size:12px; color:#6b7280; margin-top:2px}
+  .expr-item.done .expr-text{text-decoration:line-through; color:#9ca3af; text-decoration-thickness:1px}
+  .expr-item.done .expr-ko,.expr-item.done .expr-reading,.expr-item.done .expr-wrong,.expr-item.done .expr-note{opacity:.55}
+
+  .empty{text-align:center; padding:56px 20px; color:var(--muted)}
+  .empty .big{font-size:34px; margin-bottom:8px}
+  .empty p{font-size:14px}
+
+  /* ---------- 게임 ---------- */
+  .game-controls{display:flex; flex-direction:column; gap:10px; margin-bottom:16px}
+  .ctrl-row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .ctrl-label{font-size:12px; font-weight:800; color:#8b90a3; width:38px; flex:0 0 auto}
+  .seg{display:inline-flex; flex-wrap:wrap; gap:5px}
+  .seg button{border:1px solid var(--line); background:#fff; color:#4b5563; border-radius:9px; padding:6px 12px; font-size:13px; font-weight:600}
+  .seg button:hover{border-color:#c7cbe0}
+  .seg button.on{background:#eef0ff; border-color:#c7c9f5; color:var(--accent); font-weight:800}
+  .seg button.on.mode{background:var(--accent); border-color:var(--accent); color:#fff}
+  .game-note{font-size:12.5px; color:var(--muted); background:#f8f9fd; border:1px solid var(--line); border-radius:10px; padding:8px 12px}
+  .game-note b{color:#374151}
+
+  .q-head{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; border-bottom:1px dashed var(--line); padding-bottom:10px; margin-bottom:14px}
+  .q-no{font-size:13px; font-weight:800; color:var(--accent)}
+  .q-score{font-size:12.5px; color:var(--muted)}
+  .q-score b{color:var(--ok)}
+  .q-lang{font-size:12.5px; color:var(--muted); margin-bottom:4px}
+  .q-prompt{font-size:19px; font-weight:800; letter-spacing:-.01em; line-height:1.45; margin-bottom:4px}
+  .q-sub{font-size:12.5px; color:var(--muted); margin-bottom:14px}
+  .opts{display:grid; gap:8px; margin-bottom:14px}
+  .opt{display:flex; gap:9px; align-items:flex-start; text-align:left; width:100%; border:1px solid var(--line); background:#fff; border-radius:11px; padding:11px 13px; font-size:15px; font-weight:600; color:#1f2937}
+  .opt .k{flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:#f1f2f8; color:#6b7280; font-size:11.5px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; margin-top:2px}
+  .opt:hover:not(:disabled){border-color:#c7cbe0; background:#fcfcff}
+  .opt:disabled,.opt.locked{cursor:default; opacity:.85}
+  .opt.correct{border-color:var(--ok); background:#ecfdf5; color:#065f46; opacity:1}
+  .opt.correct .k{background:var(--ok); color:#fff}
+  .opt.wrong{border-color:#fca5a5; background:#fef2f2; color:#991b1b; opacity:1}
+  .opt.wrong .k{background:var(--bad); color:#fff}
+  .opt .olang{font-size:11px; color:#9ca3af; margin-left:4px; font-weight:600}
+
+  .q-actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:4px}
+  .btn{border:1px solid var(--line); background:#fff; color:#374151; border-radius:10px; padding:8px 13px; font-size:13.5px; font-weight:700}
+  .btn:hover:not(:disabled){border-color:#c7cbe0}
+  .btn:disabled{opacity:.45; cursor:not-allowed}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn.hint{background:#fffbeb; border-color:#fde68a; color:#92400e}
+  .btn.reveal{background:#fef2f2; border-color:#fecaca; color:#991b1b}
+  .btn.mic{background:#eef2ff; border-color:#c7d2fe; color:#3730a3}
+  .btn.mic.on{background:#dc2626; border-color:#dc2626; color:#fff}
+
+  .feedback{font-size:13.5px; font-weight:700; margin-top:12px; padding:9px 12px; border-radius:10px; display:none}
+  .feedback.show{display:block}
+  .feedback.ok{background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0}
+  .feedback.no{background:#fef2f2; color:#991b1b; border:1px solid #fecaca}
+  .feedback.info{background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe}
+  .hintbox{font-size:13px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:9px 12px; margin-top:10px; display:none}
+  .hintbox.show{display:block}
+  .answerbox{display:none; margin-top:12px; border:1px solid #c7d2fe; background:#f5f7ff; border-radius:12px; padding:12px 14px}
+  .answerbox.show{display:block}
+  .answerbox .ab-label{font-size:11.5px; font-weight:800; color:var(--accent); letter-spacing:.02em; margin-bottom:4px}
+  .answerbox .ab-text{font-size:17px; font-weight:800; color:#111827; line-height:1.5; word-break:break-word}
+  .answerbox .ab-reading{font-size:13px; color:#6b7280; margin-top:4px}
+  .answerbox .ab-ko{font-size:13px; color:#4b5563; margin-top:3px}
+  .answerbox .ab-note{font-size:12.5px; color:#6b7280; margin-top:6px}
+
+  /* 배열 게임 */
+  .answer-line{min-height:58px; border:1.5px dashed #c7cbe0; border-radius:12px; background:#fbfbff; padding:8px; display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; margin-bottom:12px}
+  .answer-line.filled{border-style:solid; border-color:#c7d2fe; background:#fff}
+  .answer-line .ph{font-size:12.5px; color:#9ca3af; padding:8px 6px}
+  .pool{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px}
+  .tok{border:1px solid #cbd5e1; background:#fff; color:#1f2937; border-radius:9px; padding:6px 11px; font-size:14.5px; font-weight:600; box-shadow:0 1px 1px rgba(20,25,50,.04)}
+  .tok:hover{border-color:#94a3b8; background:#f8fafc}
+  .tok.in{border-color:#a5b4fc; background:#eef2ff; color:#3730a3}
+  .tok.in:hover{background:#e0e7ff}
+  .tok.used{display:none}
+  .answer-line.shake{animation:shake .28s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+  /* 말하기 게임 */
+  .mic-row{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px}
+  .heard{font-size:13.5px; color:#374151; background:#f8f9fd; border:1px solid var(--line); border-radius:10px; padding:9px 12px; margin-top:4px; display:none}
+  .heard.show{display:block}
+  .heard b{color:#111827}
+  .manual{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+  .manual input{flex:1 1 200px; min-width:0; border:1px solid var(--line); border-radius:10px; padding:9px 12px; font:inherit; font-size:14px; background:#fff; color:var(--ink)}
+  .manual input:focus{outline:2px solid #c7c9f5; outline-offset:1px; border-color:var(--accent)}
+  .warnbox{font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:9px 12px; margin-bottom:12px; display:none}
+  .warnbox.show{display:block}
+  .summary{text-align:center; padding:20px 10px 8px}
+  .summary .big{font-size:40px; margin-bottom:6px}
+  .summary h3{font-size:19px; margin-bottom:6px}
+  .summary p{font-size:13.5px; color:var(--muted); margin-bottom:16px}
+  .summary .score{font-size:15px; font-weight:800; color:#111827; margin-bottom:16px}
+
+  /* ---------- 원어민 음성 듣기 ---------- */
+  .speakbar{max-width:1080px; margin:7px auto 0; display:flex; flex-wrap:wrap; gap:7px; align-items:center; font-size:11.5px; color:#6b7280}
+  .speakbar .lbl{font-weight:800; color:#4b5563}
+  .speakbar .tip{font-weight:500; color:#8b90a3}
+  .spd{border:1px solid var(--line); background:#fff; color:#4b5563; border-radius:999px; padding:3px 9px; font-size:11.5px; font-weight:700; line-height:1.35}
+  .spd:hover{border-color:#c7cbe0}
+  .spd.on{background:var(--accent-soft); border-color:#c7c9f5; color:var(--accent)}
+  .tts{display:inline-flex; align-items:center; justify-content:center; gap:3px; flex:0 0 auto; border:1px solid #d8dced; background:#fff; color:#4b5563; border-radius:999px; min-width:27px; height:24px; padding:0 7px; font-size:12px; font-weight:700; line-height:1; vertical-align:middle}
+  .tts:hover{border-color:var(--accent); color:var(--accent); background:#f7f7ff}
+  .tts.tiny{min-width:21px; height:19px; padding:0 4px; font-size:10px; border-radius:999px}
+  .tts.sm{height:21px; min-width:23px; padding:0 6px; font-size:11px}
+  .tts.playing,.btn.playing,.mini.playing{background:var(--accent); border-color:var(--accent); color:#fff}
+  .tts.playing{animation:ttsPulse 1s infinite}
+  @keyframes ttsPulse{0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,.35)}50%{box-shadow:0 0 0 5px rgba(79,70,229,0)}}
+  .tts-text{cursor:pointer}
+  .tts-text:hover{background:#f7f8ff; box-shadow:0 0 0 4px #f7f8ff; border-radius:5px}
+  .ans-row{display:flex; gap:8px; align-items:flex-start}
+  .ans-row .ans-text{flex:1 1 auto; min-width:0}
+  .ans-row .tts{margin-top:4px}
+  .ans-reading .rl{display:inline-block; font-size:10.5px; font-weight:800; color:#0369a1; background:#eaf6ff; border:1px solid #cfeaff; border-radius:5px; padding:0 5px; margin-right:5px; letter-spacing:-.01em}
+  .expr-top .tts{margin-top:1px}
+  .expr-text.tts-text{word-break:break-word}
+  .opt-body{display:flex; flex-direction:column; gap:1px; min-width:0; flex:1 1 auto; text-align:left}
+  .opt-t{font-weight:700}
+  .opt-r{font-size:12.5px; font-weight:600; color:#0369a1; line-height:1.4}
+  .opt .tts{margin-top:2px; margin-left:auto}
+  .tok{display:inline-flex; align-items:center; gap:6px}
+  .tok-body{display:flex; flex-direction:column; align-items:flex-start; gap:0; line-height:1.35}
+  .tok-r{font-size:11.5px; font-weight:600; color:#0369a1}
+  .tok .tts{margin-left:2px}
+  .hint-listen{margin-top:7px; display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+  .ab-row{display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap}
+  .ab-row .ab-text{flex:1 1 auto; min-width:0}
+  .ab-row .tts{margin-top:3px}
+  .vocab-note{font-size:12px; color:#0369a1; background:#f0f9ff; border:1px solid #cfeaff; border-radius:8px; padding:6px 9px; margin-top:6px}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(14px); z-index:130; max-width:min(92vw,540px); background:#1f2937; color:#fff; border-radius:12px; padding:10px 16px; font-size:13px; line-height:1.5; text-align:center; box-shadow:0 12px 30px rgba(10,12,30,.28); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  /* ---------- 모달 ---------- */
+  .modal{position:fixed; inset:0; z-index:80; display:none}
+  .modal.open{display:block}
+  .modal-back{position:absolute; inset:0; background:rgba(17,20,35,.45); backdrop-filter:blur(2px)}
+  .modal-card{position:relative; margin:4vh auto; width:min(760px,calc(100% - 28px)); max-height:92vh; background:#fff; border-radius:18px; box-shadow:0 24px 60px rgba(15,18,40,.3); display:flex; flex-direction:column; overflow:hidden}
+  .m-head{display:flex; gap:10px; align-items:flex-start; justify-content:space-between; padding:16px 18px 12px; border-bottom:1px solid var(--line); background:#fcfcff}
+  .m-head h2{font-size:17px; line-height:1.4; letter-spacing:-.02em}
+  .m-head .sub{font-size:12px; color:var(--muted); margin-top:2px}
+  .m-close{border:1px solid var(--line); background:#fff; border-radius:10px; width:32px; height:32px; font-size:15px; color:#4b5563; flex:0 0 auto}
+  .m-close:hover{border-color:#c7cbe0}
+  .m-body{padding:14px 18px 20px; overflow:auto; -webkit-overflow-scrolling:touch}
+  .m-meta{display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin-bottom:10px}
+  .m-topics{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px}
+  .m-card[data-lang="en"]{--c:var(--en)} .m-card[data-lang="zh"]{--c:var(--zh)} .m-card[data-lang="ja"]{--c:var(--ja)}
+  .m-card .ans-block h4{color:var(--c)}
+  .m-tools{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px}
+  .day-list li{border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:9px}
+  .day-lang{font-size:12px; font-weight:800; margin-bottom:6px}
+  .day-lang.en{color:var(--en)} .day-lang.zh{color:var(--zh)} .day-lang.ja{color:var(--ja)}
+  .day-topic{display:block; width:100%; text-align:left; border:0; border-radius:8px; background:#f7f8fd; color:#374151; padding:7px 10px; font-size:13.5px; font-weight:600; margin-top:5px}
+  .day-topic:hover{background:#eef0ff; color:var(--accent)}
+  .m-empty{font-size:13.5px; color:var(--muted); padding:12px 2px}
+
+  footer{max-width:1080px; margin:0 auto; padding:0 16px 40px; color:#9ca3af; font-size:12px; text-align:center; line-height:1.8}
+  .storage-warn{max-width:1080px; margin:12px auto 0; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; border-radius:10px; padding:9px 12px; font-size:12.5px; display:none}
+  .storage-warn.show{display:block}
+
+  @media (max-width:900px){
+    .stats{grid-template-columns:repeat(3,1fr)}
+    .cal-cell{min-height:88px}
+    .ctag{font-size:11px}
+  }
+  @media (max-width:640px){
+    body{font-size:14.5px}
+    .hero{padding:18px 15px 16px}
+    .hero h1{font-size:19px}
+    .hero-sub{font-size:12px; line-height:1.5}
+    .stats{grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px}
+    .stat{padding:6px 9px; border-radius:10px}
+    .stat .num{font-size:15.5px}
+    .stat .lbl{font-size:10.5px}
+    .overall{margin-top:11px}
+    .overall-head{font-size:11.5px; margin-bottom:5px}
+    .overall-head strong{font-size:13px}
+    .bar{height:8px}
+    .viewnav{padding:8px 12px}
+    .vtab{padding:7px 12px; font-size:13px}
+    main{padding:14px 12px 60px}
+    .panel{padding:13px 12px 12px; border-radius:14px}
+    .panel-head{gap:8px}
+    .panel-head h2{font-size:15.5px}
+    .cal-month{font-size:16px; min-width:104px}
+    .cal-nav button{padding:5px 9px; font-size:12px}
+    .cal-grid,.cal-dows{gap:3px}
+    .cal-cell{min-height:52px; padding:3px 2px; gap:2px; border-radius:9px; align-items:stretch}
+    .cal-num{font-size:11.5px; min-width:18px; height:18px; align-self:center; margin:0 auto}
+    .cal-chips{display:none}
+    .cal-dots{display:flex; justify-content:center}
+    .cdot{width:6px; height:6px}
+    .cal-dow{font-size:10.5px}
+    .topic-row{padding:8px 10px}
+    .topic-row .tname{flex:1 1 100%; font-size:13.5px}
+    .topic-row .tmeta{font-size:11.5px}
+    .q-prompt{font-size:17px}
+    .opt{font-size:14px; padding:10px 11px}
+    .m-head{padding:13px 14px 10px}
+    .m-head h2{font-size:15.5px}
+    .m-body{padding:12px 14px 18px}
+    .modal-card{margin:2vh auto; max-height:96vh; width:calc(100% - 16px); border-radius:14px}
+    .card{padding:15px 15px 4px}
+    .card-title{font-size:16.5px}
+    .listbar{gap:8px}
+    .search{flex:1 1 100%}
+    .search input{width:100%; min-width:110px}
+    .btn,.ghost{flex:1 1 auto; text-align:center; white-space:nowrap}
+    .q-actions .btn{flex:1 1 auto}
+    .tok{font-size:14px; padding:6px 10px}
+    .speakbar{gap:5px; font-size:11px}
+    .speakbar .tip{display:none}
+    .spd{padding:2px 8px; font-size:11px}
+    .ans-row .tts{height:26px; min-width:29px}
+    .opt .tts{height:26px; min-width:29px}
+    .tok .tts{height:22px; min-width:22px}
+  }
+  @media print{
+    .viewnav,.answer-tools,.answer-toggle,.game-controls,.q-actions{display:none !important}
+    .hero{background:#fff !important; color:#000 !important; border-bottom:1px solid #ddd}
+    .stat{border-color:#ddd; color:#000}
+    .stat .lbl,.hero-sub,.overall-head{color:#555}
+    .answer-wrap{display:block !important}
+    .card{box-shadow:none; break-inside:avoid}
+    body{background:#fff}
+    .view{display:block !important}
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <h1>📚 OPIc 누적 학습 대시보드</h1>
+    <p class="hero-sub">영어 · 중국어 · 일본어 회화 수업을 날짜별로 쌓고, 주제로 모아 보고, 게임으로 복습합니다.</p>
+    <div class="stats">
+      <div class="stat"><div class="num" id="s-lessons">0</div><div class="lbl">총 수업</div></div>
+      <div class="stat"><div class="num" id="s-en">0</div><div class="lbl">영어</div></div>
+      <div class="stat"><div class="num" id="s-zh">0</div><div class="lbl">중국어</div></div>
+      <div class="stat"><div class="num" id="s-ja">0</div><div class="lbl">일본어</div></div>
+      <div class="stat"><div class="num" id="s-expr">0</div><div class="lbl">외울 표현</div></div>
+      <div class="stat"><div class="num" id="s-done">0</div><div class="lbl">암기 완료</div></div>
+    </div>
+    <div class="overall">
+      <div class="overall-head"><span>전체 암기 진행률</span><strong id="s-rate">0%</strong></div>
+      <div class="bar"><div class="bar-fill" id="s-bar"></div></div>
+    </div>
+  </div>
+</header>
+
+<nav class="viewnav">
+  <div class="viewnav-inner" role="tablist" aria-label="보기 선택">
+    <button class="vtab active" data-view="calendar" role="tab" aria-selected="true">📅 한 달 달력</button>
+    <button class="vtab" data-view="topics" role="tab" aria-selected="false">🗂️ 주제 누적 <span class="cnt" id="v-topic-count">0</span></button>
+    <button class="vtab" data-view="list" role="tab" aria-selected="false">📚 수업 목록 <span class="cnt" id="v-lesson-count">0</span></button>
+    <button class="vtab" data-view="game" role="tab" aria-selected="false">🎮 복습 게임</button>
+  </div>
+  <div class="speakbar" aria-label="원어민 음성 듣기 설정">
+    <span class="lbl">🔊 듣기 속도</span>
+    <div class="seg" id="segRate" role="group" aria-label="듣기 속도 선택">
+      <button class="spd" data-rate="0.75">0.75x 천천히</button>
+      <button class="spd on" data-rate="0.9" aria-pressed="true">0.9x 기본</button>
+      <button class="spd" data-rate="1">1.0x 보통</button>
+    </div>
+    <span class="tip">문장·표현을 누르거나 🔊 버튼을 누르면 원어민 발음이 재생됩니다. 다시 누르면 멈춥니다.</span>
+  </div>
+</nav>
+
+<div class="storage-warn" id="storageWarn">이 브라우저에서는 체크 상태를 저장할 수 없습니다. 시크릿 모드가 아닌지 확인해 주세요.</div>
+
+<main>
+  <!-- 1. 달력 -->
+  <section class="view active" id="view-calendar" role="tabpanel" aria-label="한 달 달력">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="cal-nav">
+          <button id="calPrev" aria-label="이전 달">‹ 이전 달</button>
+          <button id="calToday">오늘</button>
+          <button id="calNext" aria-label="다음 달">다음 달 ›</button>
+        </div>
+        <div class="cal-month" id="calTitle">-<small id="calSummary"></small></div>
+        <div class="legend">
+          <span><i class="dot en"></i>영어</span>
+          <span><i class="dot zh"></i>중국어</span>
+          <span><i class="dot ja"></i>일본어</span>
+        </div>
+      </div>
+      <div class="cal-dows" aria-hidden="true">
+        <div class="cal-dow sun">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div>
+        <div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow sat">토</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <p class="q-sub" style="margin:10px 0 0">주제 이름을 누르면 그 수업의 공부 내용이 열립니다. 날짜 숫자를 누르면 그날의 주제가 한 번에 보입니다. (휴대폰에서는 날짜 칸의 색 점을 누르세요.)</p>
+      <div class="cal-list" id="calList"></div>
+    </div>
+  </section>
+
+  <!-- 2. 주제 누적 -->
+  <section class="view" id="view-topics" role="tabpanel" aria-label="주제 누적">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>🗂️ 영·중·일 주제 누적</h2>
+          <p>날짜와 상관없이 지금까지 다룬 OPIc 주제를 언어별로 모았습니다. 주제를 누르면 공부한 내용이 열립니다.</p>
+        </div>
+      </div>
+      <div id="topicsBody"></div>
+    </div>
+  </section>
+
+  <!-- 3. 수업 목록 -->
+  <section class="view" id="view-list" role="tabpanel" aria-label="수업 목록">
+    <div class="listbar">
+      <div class="tabs" role="tablist" aria-label="언어 선택">
+        <button class="tab active" data-lang="all" role="tab" aria-selected="true">전체 <span class="cnt" id="c-all">0</span></button>
+        <button class="tab" data-lang="en" role="tab" aria-selected="false">🇺🇸 영어 <span class="cnt" id="c-en">0</span></button>
+        <button class="tab" data-lang="zh" role="tab" aria-selected="false">🇨🇳 중국어 <span class="cnt" id="c-zh">0</span></button>
+        <button class="tab" data-lang="ja" role="tab" aria-selected="false">🇯🇵 일본어 <span class="cnt" id="c-ja">0</span></button>
+      </div>
+      <div class="controls">
+        <label class="search"><span>🔍</span><input id="search" type="search" placeholder="주제 · 표현 · 단어 검색" aria-label="검색"></label>
+        <label class="switch"><input type="checkbox" id="onlyUnmem"><span>미암기만 보기</span></label>
+        <button class="ghost" id="toggleAll">모범답안 전체 펼치기</button>
+      </div>
+    </div>
+    <div id="list"></div>
+    <div class="empty" id="empty" hidden>
+      <div class="big">🔎</div>
+      <p id="emptyText">조건에 맞는 수업이 없습니다.</p>
+    </div>
+  </section>
+
+  <!-- 4. 게임 -->
+  <section class="view" id="view-game" role="tabpanel" aria-label="복습 게임">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>🎮 표현 복습 &amp; 배열·말하기 게임</h2>
+          <p>한국어를 보고 표현을 고르고, 문장을 배열하고, 직접 말해 봅니다.</p>
+        </div>
+      </div>
+      <div class="game-controls">
+        <div class="ctrl-row"><span class="ctrl-label">언어</span>
+          <div class="seg" id="segLang">
+            <button data-gl="all" class="on">전체</button>
+            <button data-gl="en">🇺🇸 영어</button>
+            <button data-gl="zh">🇨🇳 중국어</button>
+            <button data-gl="ja">🇯🇵 일본어</button>
+          </div>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-label">범위</span>
+          <div class="seg" id="segScope">
+            <button data-gs="all" class="on">전체 표현</button>
+            <button data-gs="unmem">미암기 우선</button>
+          </div>
+        </div>
+        <div class="ctrl-row"><span class="ctrl-label">모드</span>
+          <div class="seg" id="segMode">
+            <button data-gm="quiz" class="on mode">① 표현 복습 퀴즈</button>
+            <button data-gm="arrange">② 문장 배열</button>
+            <button data-gm="speak">③ 말하기</button>
+          </div>
+        </div>
+        <div class="game-note">💡 문제마다 <b>힌트 보기</b>가 있고, <b>3번 이상 틀리면 답안 문장</b>이 열립니다.</div>
+      </div>
+      <div id="gameBody"></div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-back" data-close="1"></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="m-head">
+      <div>
+        <h2 id="modalTitle">수업</h2>
+        <div class="sub" id="modalSub"></div>
+      </div>
+      <button class="m-close" id="modalClose" data-close="1" aria-label="닫기">✕</button>
+    </div>
+    <div class="m-body" id="modalBody"></div>
+  </div>
+</div>
+
+<footer>
+  <div id="footInfo"></div>
+  <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
+  <div>빌드 2026-11-19 08:01</div>
+</footer>
+
+<script>
+"use strict";
+
+const DATA = {"meta": {"title": "OPIc 누적 학습 대시보드", "subtitle": "영어 · 중국어 · 일본어 회화 수업 기록을 한곳에 모아 매일 복습합니다.", "updated": "2026-11-19", "source": "scheduled-actions/📞-전화외국어-모닝콜/notes.md"}, "lessons": [{"id": "2026-11-19-zh", "date": "2026-11-19", "lang": "zh", "level": "IM2 → AL", "order": 1, "session": "정규 수업", "title": "현재 집·동네 vs 경기도 · 강아지 3마리 여행 · 수능일 병원 계획", "topics": ["현재 집·동네(서울 역세권·공원 강아지 산책) vs 예전 경기도 비교", "가족·반려견 3마리와 함께한 호텔·애견카페 여행", "수능일 아들 병원 방문 계획"], "model_answer": {"note": "오늘 아침 읽기 연습용으로 드린 AL 스크립트 3편입니다. 한자 → 병음(토글) → 한국어 뜻 순서로 확인하세요.", "blocks": [{"heading": "1. 집·동네 \u0026 예전(경기도) 비교", "lines": [{"text": "说实话，我非常喜欢我现在住的小区，生活环境特别方便。因为我家里养了两只狗，所以每天我都会带它们去附近的公园散步，对我来说，顺便运动一下也很方便。跟以前相比，变化真的很大。以前我住在京畿道的时候，交通不太方便，去哪儿都得自己开车。但现在不一样了，我家就在地铁站附近，想去哪里坐地铁很快就到，省了不少时间。", "reading": "Shuō shíhuà, wǒ fēicháng xǐhuan wǒ xiànzài zhù de xiǎoqū, shēnghuó huánjìng tèbié fāngbiàn. Yīnwèi wǒ jiālǐ yǎng le liǎng zhī gǒu, suǒyǐ měitiān wǒ dōu huì dài tāmen qù fùjìn de gōngyuán sànbù, duì wǒ lái shuō, shùnbiàn yùndòng yíxià yě hěn fāngbiàn. Gēn yǐqián xiāngbǐ, biànhuà zhēn de hěn dà. Yǐqián wǒ zhù zài Jīngjīdào de shíhou, jiāotōng bú tài fāngbiàn, qù nǎr dōu děi zìjǐ kāichē. Dàn xiànzài bù yíyàng le, wǒ jiā jiù zài dìtiězhàn fùjìn, xiǎng qù nǎlǐ zuò dìtiě hěn kuài jiù dào, shěng le bùshǎo shíjiān.", "ko": "솔직히 저는 지금 사는 동네를 정말 좋아합니다. 생활 환경이 특히 편리해요. 집에서 강아지 두 마리를 키우기 때문에 매일 그들을 데리고 근처 공원에 산책하러 갑니다. 저에게는 겸사겸사 운동도 되어서 아주 편리해요. 예전과 비교하면 변화가 정말 큽니다. 예전에 경기도에 살았을 때는 교통이 그리 편리하지 않아서 어디를 가든 차를 직접 운전해야 했어요. 그런데 지금은 다릅니다. 집이 지하철역 근처라서 어디든 지하철로 금방 갈 수 있고, 시간도 꽤 절약됩니다."}]}, {"heading": "2. 가족·강아지 3마리 여행 \u0026 애견카페", "lines": [{"text": "让我印象最深的一次旅行，是最近我跟妈妈、弟弟、丈夫还有儿子，带着三只狗一起去宠物友好酒店玩。那家酒店可以带宠物，所以我们一起度过了非常开心的时光。最难忘的是我们去了一家很特别的咖啡厅，外面有一片草坪公园。我们一边喝着咖啡、吃着饼干，一边看着三只狗在外面自由自在地玩耍。其实以前我从来没带三只狗一起去过咖啡厅，尤其是我妈妈的那只狗，以前从来没去过旅行，所以对我来说，那个地方真的特别有意义。", "reading": "Ràng wǒ yìnxiàng zuì shēn de yí cì lǚxíng, shì zuìjìn wǒ gēn māma, dìdi, zhàngfu hái yǒu érzi, dài zhe sān zhī gǒu yìqǐ qù chǒngwù yǒuhǎo jiǔdiàn wán. Nà jiā jiǔdiàn kěyǐ dài chǒngwù, suǒyǐ wǒmen yìqǐ dùguò le fēicháng kāixīn de shíguāng. Zuì nánwàng de shì wǒmen qù le yì jiā hěn tèbié de kāfēitīng, wàimiàn yǒu yí piàn cǎopíng gōngyuán. Wǒmen yìbiān hē zhe kāfēi, chī zhe bǐnggān, yìbiān kàn zhe sān zhī gǒu zài wàimiàn zìyóu zìzài de wánshuǎ. Qíshí yǐqián wǒ cónglái méi dài sān zhī gǒu yìqǐ qù guo kāfēitīng, yóuqí shì wǒ māma de nà zhī gǒu, yǐqián cónglái méi qù guo lǚxíng, suǒyǐ duì wǒ lái shuō, nàge dìfang zhēn de tèbié yǒu yìyì.", "ko": "제가 가장 인상 깊었던 여행은 최근에 엄마, 남동생, 남편 그리고 아들과 함께 강아지 세 마리를 데리고 반려동물 친화 호텔에 놀러 간 일입니다. 그 호텔은 반려동물을 데리고 갈 수 있어서 우리는 함께 아주 즐거운 시간을 보냈어요. 가장 잊을 수 없는 것은 아주 특별한 카페에 갔던 일인데, 밖에 잔디 공원이 있었습니다. 우리는 커피를 마시고 쿠키를 먹으면서 강아지 세 마리가 밖에서 자유롭게 노는 모습을 지켜봤어요. 사실 예전에는 강아지 세 마리를 함께 데리고 카페에 가 본 적이 없었고, 특히 엄마가 키우는 강아지는 예전에 여행을 한 번도 가 본 적이 없어서, 저에게 그곳은 정말 특별한 의미가 있습니다."}]}, {"heading": "3. 오늘(수능일) 계획", "lines": [{"text": "今天是韩国的高考日，除了高三以外，其他学生都不用去学校，所以我儿子今天也休息。不过他最近有点感冒症状，所以我打算今天带他去医院看看，希望他能早日康复。", "reading": "Jīntiān shì Hánguó de gāokǎorì, chúle gāosān yǐwài, qítā xuésheng dōu bú yòng qù xuéxiào, suǒyǐ wǒ érzi jīntiān yě xiūxi. Búguò tā zuìjìn yǒudiǎn gǎnmào zhèngzhuàng, suǒyǐ wǒ dǎsuàn jīntiān dài tā qù yīyuàn kànkan, xīwàng tā néng zǎorì kāngfù.", "ko": "오늘은 한국의 수능날이라 고3을 제외한 다른 학생들은 학교에 가지 않아도 됩니다. 그래서 우리 아들도 오늘은 쉬어요. 그런데 최근에 감기 기운이 좀 있어서 오늘 데리고 병원에 가서 진찰을 받게 할 생각입니다. 빨리 쾌차하기를 바랍니다."}]}]}, "expressions": [{"type": "word", "text": "跟以前相比", "reading": "gēn yǐqián xiāngbǐ", "ko": "예전과 비교하면"}, {"type": "word", "text": "对我来说", "reading": "duì wǒ lái shuō", "ko": "나에게 있어서 / 내 입장에서는"}, {"type": "word", "text": "过得很开心", "reading": "guò de hěn kāixīn", "ko": "아주 즐겁게 보내다", "note": "오늘 스크립트에서는 度过了非常开心的时光로 확장"}, {"type": "word", "text": "印象最深", "reading": "yìnxiàng zuì shēn", "ko": "가장 인상에 남다"}, {"type": "word", "text": "一边…一边…", "reading": "yìbiān… yìbiān…", "ko": "~하면서 ~하다"}, {"type": "word", "text": "感冒症状", "reading": "gǎnmào zhèngzhuàng", "ko": "감기 증상"}, {"type": "word", "text": "早日康复", "reading": "zǎorì kāngfù", "ko": "빨리 낫길 바라다"}, {"type": "correction", "text": "我家有两只狗，所以每天带它们去公园散步。对我来说，运动很方便。", "reading": "wǒ jiā yǒu liǎng zhī gǒu, suǒyǐ měitiān dài tāmen qù gōngyuán sànbù. duì wǒ lái shuō, yùndòng hěn fāngbiàn.", "ko": "우리 집에 강아지가 두 마리 있어서 매일 데리고 공원에 산책하러 갑니다. 저에게는 운동이 아주 편리해요.", "wrong": "每天我应该带着两只狗去公园散散步…很容易地去运动。", "note": "습관·일상은 应该 없이 每天带它们~ / 很容易地去运动 → 运动很方便"}, {"type": "correction", "text": "说实话，我以前住的地方交通不太方便，去哪儿都得开车。", "reading": "shuō shíhuà, wǒ yǐqián zhù de dìfang jiāotōng bú tài fāngbiàn, qù nǎr dōu děi kāichē.", "ko": "솔직히 예전에 살던 곳은 교통이 그리 편리하지 않아서 어디를 가든 차를 운전해야 했어요.", "wrong": "特别我住在的地方的环境是交通环境不太好…", "note": "特别是~ 대신 자연스러운 서술로, 去哪儿都得开车"}, {"type": "correction", "text": "那家酒店可以带狗，所以我们一起过了很开心的日子。", "reading": "nà jiā jiǔdiàn kěyǐ dài gǒu, suǒyǐ wǒmen yìqǐ guò le hěn kāixīn de rìzi.", "ko": "그 호텔은 개를 데리고 갈 수 있어서 우리는 함께 아주 즐거운 날을 보냈어요.", "wrong": "…可以跟三只狗享受美好的日子。", "note": "享受美好的日子보다 회화에서는 过了很开心的日子"}, {"type": "correction", "text": "我们一边喝咖啡、吃饼干，一边让三只狗在公园里玩。", "reading": "wǒmen yìbiān hē kāfēi, chī bǐnggān, yìbiān ràng sān zhī gǒu zài gōngyuán lǐ wán.", "ko": "우리는 커피를 마시고 쿠키를 먹으면서 강아지 세 마리를 공원에서 놀게 했어요.", "wrong": "一边可以喝咖啡，一边吃饼干，还有可以让我家的三只狗在公园里玩。", "note": "一边…一边… 앞뒤 주어·동사 위치 정리"}, {"type": "correction", "text": "这个地方对我来说很特别。", "reading": "zhège dìfang duì wǒ lái shuō hěn tèbié.", "ko": "이곳은 저에게 아주 특별합니다.", "wrong": "这个场所很…是觉得特别的地方。", "note": "场所 대신 일상 회화에서는 地方"}, {"type": "correction", "text": "特别是我妈妈的那只狗，以前从来没去过旅游。", "reading": "tèbié shì wǒ māma de nà zhī gǒu, yǐqián cónglái méi qù guo lǚyóu.", "ko": "특히 엄마가 키우는 그 강아지는 예전에 여행을 한 번도 가 본 적이 없어요.", "wrong": "特别是我妈的狗以前没有去过旅游。", "note": "从来没~过로 강조"}, {"type": "correction", "text": "因为我儿子最近有点感冒症状，所以我得带他去医院。", "reading": "yīnwèi wǒ érzi zuìjìn yǒudiǎn gǎnmào zhèngzhuàng, suǒyǐ wǒ děi dài tā qù yīyuàn.", "ko": "아들이 최근에 감기 증상이 좀 있어서 병원에 데리고 가야 해요.", "wrong": "因为我儿子最近有感冒像张，所以我应该带着他去医院。", "note": "症状 zhèngzhuàng / 得带他去医院"}, {"type": "advanced", "text": "一方面，以前去哪儿都得开车；另一方面，现在坐地铁很快就到。", "reading": "yì fāngmiàn, yǐqián qù nǎr dōu děi kāichē; lìng yì fāngmiàn, xiànzài zuò dìtiě hěn kuài jiù dào.", "ko": "한편으로는 예전에는 어디든 차를 운전해야 했고, 다른 한편으로는 지금은 지하철로 금방 도착합니다."}, {"type": "advanced", "text": "对我来说，这个地方真的很特别。", "reading": "duì wǒ lái shuō, zhège dìfang zhēn de hěn tèbié.", "ko": "저에게 이곳은 정말 특별합니다."}, {"type": "advanced", "text": "以前从来没带三只狗一起去过咖啡厅。", "reading": "yǐqián cónglái méi dài sān zhī gǒu yìqǐ qù guo kāfēitīng.", "ko": "예전에는 강아지 세 마리를 함께 데리고 카페에 가 본 적이 없었습니다."}, {"type": "pronunciation", "text": "小区", "reading": "xiǎo qū", "ko": "아파트 단지·동네", "note": "qū는 '취'에 가깝게. '추'로 읽지 않기"}, {"type": "pronunciation", "text": "养了两只狗", "reading": "yǎng le liǎng zhī gǒu", "ko": "개 두 마리를 키웠다/키우고 있다", "note": "liǎng(량 아님, '리앙'), zhī는 가볍게, gǒu는 3성"}, {"type": "pronunciation", "text": "早日康复", "reading": "zǎorì kāngfù", "ko": "빨리 쾌차하길", "note": "zǎorì는 '짜오르', kāngfù는 '캉푸'로 붙여 읽기"}], "practice": [{"ko": "솔직히 저는 지금 사는 동네를 정말 좋아합니다. 생활 환경이 특히 편리해요.", "text": "说实话，我非常喜欢我现在住的小区，生活环境特别方便。", "reading": "Shuō shíhuà, wǒ fēicháng xǐhuan wǒ xiànzài zhù de xiǎoqū, shēnghuó huánjìng tèbié fāngbiàn.", "tokens": ["说实话，", "我", "非常", "喜欢", "我", "现在", "住的", "小区，", "生活", "环境", "特别", "方便。"]}, {"ko": "집에서 강아지 두 마리를 키우기 때문에, 매일 그들을 데리고 근처 공원에 산책하러 갑니다.", "text": "因为我家里养了两只狗，所以每天我都会带它们去附近的公园散步。", "reading": "Yīnwèi wǒ jiālǐ yǎng le liǎng zhī gǒu, suǒyǐ měitiān wǒ dōu huì dài tāmen qù fùjìn de gōngyuán sànbù.", "tokens": ["因为", "我", "家里", "养了", "两只", "狗，", "所以", "每天", "我", "都会", "带", "它们", "去", "附近", "的", "公园", "散步。"]}, {"ko": "예전과 비교하면 변화가 정말 큽니다.", "text": "跟以前相比，变化真的很大。", "reading": "Gēn yǐqián xiāngbǐ, biànhuà zhēn de hěn dà.", "tokens": ["跟", "以前", "相比，", "变化", "真的", "很大。"]}, {"ko": "그런데 지금은 다릅니다. 집이 지하철역 근처라서 어디든 지하철로 금방 갑니다.", "text": "但现在不一样了，我家就在地铁站附近，想去哪里坐地铁很快就到。", "reading": "Dàn xiànzài bù yíyàng le, wǒ jiā jiù zài dìtiězhàn fùjìn, xiǎng qù nǎlǐ zuò dìtiě hěn kuài jiù dào.", "tokens": ["但", "现在", "不一样了，", "我", "家", "就", "在", "地铁站", "附近，", "想", "去", "哪里", "坐", "地铁", "很快", "就", "到。"]}, {"ko": "그 호텔은 반려동물을 데리고 갈 수 있어서, 우리는 함께 아주 즐거운 시간을 보냈어요.", "text": "那家酒店可以带宠物，所以我们一起度过了非常开心的时光。", "reading": "Nà jiā jiǔdiàn kěyǐ dài chǒngwù, suǒyǐ wǒmen yìqǐ dùguò le fēicháng kāixīn de shíguāng.", "tokens": ["那家", "酒店", "可以", "带", "宠物，", "所以", "我们", "一起", "度过了", "非常", "开心", "的", "时光。"]}, {"ko": "우리는 커피를 마시고 쿠키를 먹으면서, 강아지 세 마리가 밖에서 자유롭게 노는 모습을 지켜봤어요.", "text": "我们一边喝着咖啡、吃着饼干，一边看着三只狗在外面自由自在地玩耍。", "reading": "Wǒmen yìbiān hē zhe kāfēi, chī zhe bǐnggān, yìbiān kàn zhe sān zhī gǒu zài wàimiàn zìyóu zìzài de wánshuǎ.", "tokens": ["我们", "一边", "喝着", "咖啡、", "吃着", "饼干，", "一边", "看着", "三只", "狗", "在", "外面", "自由自在", "地", "玩耍。"]}, {"ko": "그런데 최근에 감기 기운이 좀 있어서, 오늘 데리고 병원에 가서 진찰을 받게 할 생각입니다.", "text": "不过他最近有点感冒症状，所以我打算今天带他去医院看看，希望他能早日康复。", "reading": "Búguò tā zuìjìn yǒudiǎn gǎnmào zhèngzhuàng, suǒyǐ wǒ dǎsuàn jīntiān dài tā qù yīyuàn kànkan, xīwàng tā néng zǎorì kāngfù.", "tokens": ["不过", "他", "最近", "有点", "感冒", "症状，", "所以", "我", "打算", "今天", "带", "他", "去", "医院", "看看，", "希望", "他", "能", "早日", "康复。"]}]}, {"id": "2026-11-18-en", "date": "2026-11-18", "lang": "en", "level": "IM1 → AL", "order": 1, "session": "정규 수업", "title": "학생들 기말고사 · 학부모 상담 앱 · 헬스장 웨이트", "topics": ["학생들 기말고사", "직접 만든 학부모 상담 앱(5시간 제작) \u0026 건강 앱 구상", "오늘 헬스장 웨이트 계획"], "model_answer": {"note": "구체적인 숫자(about twenty-five students, five hours)와 에피소드(bugs that stopped my app)를 넣어 IM1에서 AL로 올라가는 구조로 다듬었습니다.", "blocks": [{"heading": "OPIc AL 모범답안", "lines": [{"text": "It's been a busy week for me because my students have their final exams coming up. I teach English, science, and math to about twenty-five students, so these days I'm helping them review and giving them extra practice tests. They're busy studying for their exams, and honestly, I'm just as busy as they are."}, {"text": "What's exciting is that I made my own app for consulting with my students' parents. I'm not a developer, but I built it in about five hours with an AI tool, and it's running smoothly so far. Sometimes I found bugs that stopped my app from working, so I had to fix them several times. I also have an idea for a health app, but I haven't decided on the functions yet — I'd like to build it someday. Later today I'm going to the gym to lift weights, because I love working out and it's the best way for me to stay in shape."}]}]}, "expressions": [{"type": "word", "text": "have final exams coming up", "ko": "기말고사가 다가오다"}, {"type": "word", "text": "be busy studying for ~", "ko": "~ 공부하느라 바쁘다"}, {"type": "word", "text": "running smoothly", "ko": "순조롭게 잘 돌아가다"}, {"type": "word", "text": "stop ~ from -ing", "ko": "~가 -하지 못하게 막다"}, {"type": "word", "text": "lift weights", "ko": "웨이트 트레이닝을 하다"}, {"type": "word", "text": "stay in shape", "ko": "건강·몸매를 유지하다"}, {"type": "correction", "text": "My students have final exams coming up, so they're busy studying for English, science, and math.", "ko": "학생들은 기말고사가 다가와서 영어·과학·수학 공부하느라 바빠요.", "wrong": "They are busy to study.", "note": "학생 복수형 students, be busy -ing"}, {"type": "correction", "text": "I'm not sure what they'll do after their exams.", "ko": "시험이 끝나고 뭘 할지는 잘 모르겠어요.", "wrong": "I don't know that what they are doing after their exam.", "note": "what 앞에 that 불필요, 미래 시제 they'll do"}, {"type": "correction", "text": "It's an app for consulting with my students' parents.", "ko": "학부모님들과 상담하는 앱이에요.", "wrong": "The application that can consult my student parents.", "note": "복수 소유격 students' parents"}, {"type": "correction", "text": "It took me five hours.", "ko": "다섯 시간 걸렸어요.", "wrong": "I made my application using a lot hours.", "note": "소요 시간은 It took me ~"}, {"type": "correction", "text": "I'm going to the gym to lift weights today, because I love it and want to stay in shape.", "ko": "오늘은 웨이트 하러 헬스장에 가요. 좋아하기도 하고 몸매도 유지하고 싶거든요.", "wrong": "go to gym to wait lifting to shape my health body", "note": "lift weights, stay in shape"}, {"type": "advanced", "text": "It's running smoothly.", "ko": "잘 돌아가고 있어요."}, {"type": "advanced", "text": "Sometimes I found bugs that stopped my app from working, so I had to fix them several times.", "ko": "가끔 앱이 작동하지 않게 만드는 버그를 발견해서 여러 번 고쳐야 했어요."}, {"type": "advanced", "text": "I haven't decided on the functions yet, but I'd like to build it someday.", "ko": "기능은 아직 정하지 못했지만, 언젠가 만들어 보고 싶어요."}], "practice": [{"ko": "학생들 기말고사가 다가와서 이번 주는 정말 바빴어요.", "text": "It's been a busy week for me because my students have their final exams coming up."}, {"ko": "저는 약 스물다섯 명의 학생에게 영어, 과학, 수학을 가르쳐요.", "text": "I teach English, science, and math to about twenty-five students."}, {"ko": "저는 개발자가 아니지만, AI 도구로 다섯 시간 만에 이 앱을 만들었어요.", "text": "I'm not a developer, but I built it in about five hours with an AI tool."}, {"ko": "가끔 제 앱이 작동하지 못하게 만드는 버그를 발견했어요.", "text": "Sometimes I found bugs that stopped my app from working."}, {"ko": "오늘 이따가 웨이트를 하러 헬스장에 갈 거예요.", "text": "Later today I'm going to the gym to lift weights."}, {"ko": "운동을 좋아해서, 그게 제가 몸매를 유지하는 가장 좋은 방법이에요.", "text": "I love working out and it's the best way for me to stay in shape."}]}, {"id": "2026-11-18-zh", "date": "2026-11-18", "lang": "zh", "level": "IM2 → AL", "order": 2, "session": "체험 수업 · 레벨 점검 (탄탄한 IM2, IM3 근접)", "title": "오늘 기분 · 헬스장 근력 운동 · 과외 수업 / AI 도구와 업무 효율", "topics": ["오늘 기분", "점심 식사 후 헬스장 웨이트(근력 운동) 계획", "과외 수업 일정", "AI 도구 제작 경험과 업무 효율 변화"], "model_answer": {"note": "체험·레벨 점검 때 말한 내용을 OPIc AL 구조(상황 → 구체적 설명 → 느낌·마무리)로 다듬었습니다.", "blocks": [{"heading": "1. 오늘 기분 · 헬스장 · 과외 수업", "lines": [{"text": "今天我的状态特别好，整个人都充满了干劲儿。中午吃完饭以后，我打算去健身房练肌肉。因为我是老师，每天都要上好几节课，所以上完课以后锻炼一下，反而觉得精力更足。我希望每天都能精力满满，事事顺心。", "reading": "Jīntiān wǒ de zhuàngtài tèbié hǎo, zhěnggè rén dōu chōngmǎn le gànjìnr. Zhōngwǔ chī wán fàn yǐhòu, wǒ dǎsuàn qù jiànshēnfáng liàn jīròu. Yīnwèi wǒ shì lǎoshī, měitiān dōu yào shàng hǎo jǐ jié kè, suǒyǐ shàng wán kè yǐhòu duànliàn yíxià, fǎnfér juéde jīnglì gèng zú. Wǒ xīwàng měitiān dōu néng jīnglì mǎnmǎn, shìshì shùnxīn.", "ko": "오늘 컨디션이 아주 좋아서 온몸에 의욕이 넘칩니다. 점심을 먹고 나서 헬스장에 가서 근력 운동을 할 계획이에요. 저는 선생님이라 매일 수업을 여러 개 해야 하는데, 수업이 끝난 뒤에 운동을 하면 오히려 에너지가 더 넘친다고 느낍니다. 매일 에너지가 넘치고 모든 일이 뜻대로 풀리길 바랍니다."}]}, {"heading": "2. AI 도구 제작 경험 · 업무 효율", "lines": [{"text": "另外，我最近用 AI 做了很多工具，比如给家长咨询用的程序，还有教学资料。AI 的发展速度真的很快，它让我备课和做资料的时间减少了很多，提高了工作效率。不过我觉得，AI 只是一个工具，如何合理使用才是关键。总的来说，它对我的教学工作帮助很大。", "reading": "Lìngwài, wǒ zuìjìn yòng AI zuò le hěn duō gōngjù, bǐrú gěi jiāzhǎng zīxún yòng de chéngxù, hái yǒu jiàoxué zīliào. AI de fāzhǎn sùdù zhēn de hěn kuài, tā ràng wǒ bèikè hé zuò zīliào de shíjiān jiǎnshǎo le hěn duō, tígāo le gōngzuò xiàolǜ. Búguò wǒ juéde, AI zhǐshì yí gè gōngjù, rúhé hélǐ shǐyòng cái shì guānjiàn. Zǒng de lái shuō, tā duì wǒ de jiàoxué gōngzuò bāngzhù hěn dà.", "ko": "또 최근에 AI로 많은 도구를 만들었습니다. 예를 들어 학부모 상담용 프로그램이라든지 수업 자료 같은 것이죠. AI의 발전 속도는 정말 빠르고, 덕분에 수업 준비와 자료 제작 시간이 많이 줄어 업무 효율이 높아졌습니다. 하지만 AI는 하나의 도구일 뿐이고, 어떻게 합리적으로 사용하느냐가 핵심이라고 생각합니다. 전체적으로 AI는 제 수업 업무에 큰 도움이 됩니다."}]}]}, "expressions": [{"type": "word", "text": "充满干劲儿", "reading": "chōngmǎn gànjìnr", "ko": "의욕·활력이 넘치다"}, {"type": "word", "text": "练肌肉", "reading": "liàn jīròu", "ko": "근력 운동을 하다 / 근육을 키우다"}, {"type": "word", "text": "上好几节课", "reading": "shàng hǎo jǐ jié kè", "ko": "수업을 여러 개 하다"}, {"type": "word", "text": "精力满满", "reading": "jīnglì mǎnmǎn", "ko": "에너지가 넘치다"}, {"type": "word", "text": "事事顺心", "reading": "shìshì shùnxīn", "ko": "모든 일이 뜻대로 잘 풀리다"}, {"type": "correction", "text": "去健身房练肌肉", "reading": "qù jiànshēnfáng liàn jīròu", "ko": "헬스장에 가서 근력 운동을 하다", "wrong": "进行肌肉运动", "note": "肌肉运动 대신 练肌肉"}, {"type": "correction", "text": "因为我是老师，每天都要上好几节课。", "reading": "yīnwèi wǒ shì lǎoshī, měitiān dōu yào shàng hǎo jǐ jié kè.", "ko": "저는 선생님이라 매일 수업을 여러 개 해야 해요.", "wrong": "我要进行上课，因为我是老师，每天应该上几门课。", "note": "강사 수업은 上课 / 上好几节课, 每天都要~"}, {"type": "correction", "text": "为了提高学生的水平", "reading": "wèile tígāo xuésheng de shuǐpíng", "ko": "학생들의 수준을 높이기 위해", "wrong": "为了学生的水平的提高", "note": "提高 동사 + 목적어 어순"}, {"type": "correction", "text": "开始上课 / 备课 / 制作教学资料", "reading": "kāishǐ shàngkè / bèikè / zhìzuò jiàoxué zīliào", "ko": "수업을 시작하다 / 수업을 준비하다 / 수업 자료를 만들다", "wrong": "进行上课 / 进行做上课上的资料", "note": "일상 동사 앞 불필요한 进行 빼기"}, {"type": "correction", "text": "AI 的发展速度", "reading": "AI de fāzhǎn sùdù", "ko": "AI의 발전 속도", "wrong": "AI 发达速度", "note": "发达 대신 发展"}, {"type": "correction", "text": "我用 AI 做了很多工具", "reading": "wǒ yòng AI zuò le hěn duō gōngjù", "ko": "저는 AI로 많은 도구를 만들었어요", "wrong": "用 AI 我做了许多工具", "note": "주어 我 뒤에 수단 用 AI 배치"}, {"type": "correction", "text": "提高了工作效率", "reading": "tígāo le gōngzuò xiàolǜ", "ko": "업무 효율을 높였다", "wrong": "工作上的速度比现在快一点", "note": "자연스러운 업무 효율 표현"}, {"type": "advanced", "text": "今天状态特别好，整个人都充满了干劲儿。", "reading": "jīntiān zhuàngtài tèbié hǎo, zhěnggè rén dōu chōngmǎn le gànjìnr.", "ko": "오늘 컨디션이 아주 좋고 온몸에 의욕이 넘쳐요."}, {"type": "advanced", "text": "愿你今天精力满满，事事顺心。", "reading": "yuàn nǐ jīntiān jīnglì mǎnmǎn, shìshì shùnxīn.", "ko": "오늘 하루 에너지 넘치고 모든 일이 순조롭길 바라요."}, {"type": "advanced", "text": "如何合理使用才是关键。", "reading": "rúhé hélǐ shǐyòng cái shì guānjiàn.", "ko": "어떻게 잘 활용하느냐가 핵심이에요."}, {"type": "advanced", "text": "对我的教学工作帮助很大。", "reading": "duì wǒ de jiàoxué gōngzuò bāngzhù hěn dà.", "ko": "제 수업 업무에 큰 도움이 됩니다."}], "practice": [{"ko": "오늘 제 컨디션이 아주 좋아서 온몸에 의욕이 넘칩니다.", "text": "今天我的状态特别好，整个人都充满了干劲儿。", "reading": "Jīntiān wǒ de zhuàngtài tèbié hǎo, zhěnggè rén dōu chōngmǎn le gànjìnr.", "tokens": ["今天", "我的", "状态", "特别", "好，", "整个人", "都", "充满了", "干劲儿。"]}, {"ko": "점심을 먹고 나서 헬스장에 가서 근력 운동을 할 계획이에요.", "text": "中午吃完饭以后，我打算去健身房练肌肉。", "reading": "Zhōngwǔ chī wán fàn yǐhòu, wǒ dǎsuàn qù jiànshēnfáng liàn jīròu.", "tokens": ["中午", "吃完饭", "以后，", "我", "打算", "去", "健身房", "练", "肌肉。"]}, {"ko": "저는 선생님이라서 매일 수업을 여러 개 해야 해요.", "text": "因为我是老师，每天都要上好几节课。", "reading": "Yīnwèi wǒ shì lǎoshī, měitiān dōu yào shàng hǎo jǐ jié kè.", "tokens": ["因为", "我", "是", "老师，", "每天", "都", "要", "上", "好几节课。"]}, {"ko": "수업이 끝난 뒤에 운동을 하면 오히려 에너지가 더 넘친다고 느껴요.", "text": "上完课以后锻炼一下，反而觉得精力更足。", "reading": "shàng wán kè yǐhòu duànliàn yíxià, fǎnfér juéde jīnglì gèng zú.", "tokens": ["上完课", "以后", "锻炼", "一下，", "反而", "觉得", "精力", "更足。"]}, {"ko": "또 최근에 AI로 많은 도구를 만들었어요. 예를 들어 학부모 상담용 프로그램이라든지 수업 자료 같은 것이죠.", "text": "另外，我最近用 AI 做了很多工具，比如给家长咨询用的程序，还有教学资料。", "reading": "Lìngwài, wǒ zuìjìn yòng AI zuò le hěn duō gōngjù, bǐrú gěi jiāzhǎng zīxún yòng de chéngxù, hái yǒu jiàoxué zīliào.", "tokens": ["另外，", "我", "最近", "用", "AI", "做了", "很多", "工具，", "比如", "给", "家长", "咨询", "用", "的", "程序，", "还有", "教学", "资料。"]}, {"ko": "AI의 발전 속도는 정말 빠릅니다.", "text": "AI 的发展速度真的很快。", "reading": "AI de fāzhǎn sùdù zhēn de hěn kuài.", "tokens": ["AI", "的", "发展速度", "真的", "很快。"]}, {"ko": "그 덕분에 수업 준비와 자료 제작 시간이 많이 줄고, 업무 효율이 높아졌습니다.", "text": "它让我备课和做资料的时间减少了很多，提高了工作效率。", "reading": "tā ràng wǒ bèikè hé zuò zīliào de shíjiān jiǎnshǎo le hěn duō, tígāo le gōngzuò xiàolǜ.", "tokens": ["它", "让", "我", "备课", "和", "做", "资料", "的", "时间", "减少了", "很多，", "提高了", "工作", "效率。"]}, {"ko": "하지만 AI는 하나의 도구일 뿐이고, 어떻게 합리적으로 사용하느냐가 핵심이라고 생각합니다.", "text": "不过我觉得，AI 只是一个工具，如何合理使用才是关键。", "reading": "Búguò wǒ juéde, AI zhǐshì yí gè gōngjù, rúhé hélǐ shǐyòng cái shì guānjiàn.", "tokens": ["不过", "我", "觉得，", "AI", "只是", "一个", "工具，", "如何", "合理", "使用", "才是", "关键。"]}]}, {"id": "2026-11-18-ja", "date": "2026-11-18", "lang": "ja", "level": "NL → AL", "order": 3, "session": "첫 수업 (입문)", "title": "자기소개와 좋아하는 것 (첫 수업)", "topics": ["자기소개", "좋아하는 것 말하기", "わたしは〜です (와타시와 ~데스)", "〜がすきです (~가 스키데스)"], "model_answer": {"note": "첫 수업에서 배운 두 패턴만으로 만들 수 있는 문장들입니다. 히라가나 → 한국어 발음 → 뜻 순서로 소리 내어 읽어 보세요.", "blocks": [{"heading": "1. 기본 자기소개 — わたしは 〜 です (와타시와 ~ 데스)", "lines": [{"text": "わたしは ベラ です。", "reading": "와타시와 베라 데스", "ko": "저는 BELLA입니다."}, {"text": "わたしは せんせい です。", "reading": "와타시와 센세이 데스", "ko": "저는 선생님입니다."}, {"text": "わたしは かんこくじん です。", "reading": "와타시와 칸코쿠진 데스", "ko": "저는 한국인입니다."}]}, {"heading": "2. 좋아하는 것 — 〜が すきです (~가 스키데스)", "lines": [{"text": "コーヒーが すきです。", "reading": "코-히-가 스키데스", "ko": "커피를 좋아합니다."}, {"text": "おんがくが すきです。", "reading": "온가쿠가 스키데스", "ko": "음악을 좋아합니다."}, {"text": "いぬが すきです。", "reading": "이누가 스키데스", "ko": "강아지를 좋아합니다."}, {"text": "にほんごが すきです。", "reading": "니혼고가 스키데스", "ko": "일본어를 좋아합니다."}]}, {"heading": "3. 이어 붙인 자기소개 (완성 문장)", "note": "と(토)는 '~와/과'로, 두 가지를 한 번에 말할 때 씁니다.", "lines": [{"text": "わたしは ベラ です。せんせい です。", "reading": "와타시와 베라 데스. 센세이 데스.", "ko": "저는 BELLA입니다. 선생님입니다."}, {"text": "コーヒーと おんがくが すきです。", "reading": "코-히-토 온가쿠가 스키데스", "ko": "커피와 음악을 좋아합니다."}]}, {"heading": "4. 오늘의 인사 표현", "lines": [{"text": "おはようございます。", "reading": "오하요- 고자이마스", "ko": "좋은 아침이에요."}, {"text": "いっしょに がんばりましょう。", "reading": "잇쇼니 간바리마쇼", "ko": "함께 힘내요."}]}, {"heading": "5. 발음 포인트 — 장음", "note": "コーヒー(코-히-)의 '히-'를 짧게 하면 こおり(코오리, 얼음)처럼 들립니다.", "lines": [{"text": "コーヒー", "reading": "코-히-", "ko": "커피 (장음 '히-'를 길게)"}, {"text": "こおり", "reading": "코오리", "ko": "얼음 (비교 연습)"}]}]}, "expressions": [{"type": "pattern", "text": "わたしは 〜 です", "reading": "와타시와 ~ 데스", "ko": "저는 ~입니다"}, {"type": "pattern", "text": "〜が すきです", "reading": "~가 스키데스", "ko": "~를 좋아합니다"}, {"type": "word", "text": "おはようございます", "reading": "오하요- 고자이마스", "ko": "좋은 아침이에요"}, {"type": "word", "text": "わたしは せんせい です", "reading": "와타시와 센세이 데스", "ko": "저는 선생님입니다"}, {"type": "word", "text": "コーヒーが すきです", "reading": "코-히-가 스키데스", "ko": "커피를 좋아합니다"}, {"type": "word", "text": "おんがくが すきです", "reading": "온가쿠가 스키데스", "ko": "음악을 좋아합니다"}, {"type": "word", "text": "いっしょに がんばりましょう", "reading": "잇쇼니 간바리마쇼", "ko": "함께 힘내요"}, {"type": "pronunciation", "text": "コーヒー", "reading": "코-히-", "ko": "커피", "note": "장음 '히-'를 길게. 氷(こおり, 코오리, 얼음)와 구분 연습 완료"}], "practice": [{"ko": "저는 BELLA입니다.", "text": "わたしは ベラ です。", "tokens": ["わたしは", "ベラ", "です。"], "reading": "와타시와 베라 데스", "token_readings": ["와타시와", "베라", "데스"]}, {"ko": "저는 선생님입니다.", "text": "わたしは せんせい です。", "tokens": ["わたしは", "せんせい", "です。"], "reading": "와타시와 센세이 데스", "token_readings": ["와타시와", "센세이", "데스"]}, {"ko": "저는 한국인입니다.", "text": "わたしは かんこくじん です。", "tokens": ["わたしは", "かんこくじん", "です。"], "reading": "와타시와 칸코쿠진 데스", "token_readings": ["와타시와", "칸코쿠진", "데스"]}, {"ko": "커피를 좋아합니다.", "text": "コーヒーが すきです。", "tokens": ["コーヒーが", "すきです。"], "reading": "코-히-가 스키데스", "token_readings": ["코-히-가", "스키데스"]}, {"ko": "커피와 음악을 좋아합니다.", "text": "コーヒーと おんがくが すきです。", "tokens": ["コーヒーと", "おんがくが", "すきです。"], "reading": "코-히-토 온가쿠가 스키데스", "token_readings": ["코-히-토", "온가쿠가", "스키데스"]}, {"ko": "함께 힘내요.", "text": "いっしょに がんばりましょう。", "tokens": ["いっしょに", "がんばりましょう。"], "reading": "잇쇼니 간바리마쇼", "token_readings": ["잇쇼니", "간바리마쇼"]}]}], "practice": [{"id": "p1", "lid": "2026-11-19-zh", "lang": "zh", "date": "2026-11-19", "ko": "솔직히 저는 지금 사는 동네를 정말 좋아합니다. 생활 환경이 특히 편리해요.", "text": "说实话，我非常喜欢我现在住的小区，生活环境特别方便。", "tokens": ["说实话，", "我", "非常", "喜欢", "我", "现在", "住的", "小区，", "生活", "环境", "特别", "方便。"], "token_readings": [], "reading": "Shuō shíhuà, wǒ fēicháng xǐhuan wǒ xiànzài zhù de xiǎoqū, shēnghuó huánjìng tèbié fāngbiàn."}, {"id": "p2", "lid": "2026-11-19-zh", "lang": "zh", "date": "2026-11-19", "ko": "집에서 강아지 두 마리를 키우기 때문에, 매일 그들을 데리고 근처 공원에 산책하러 갑니다.", "text": "因为我家里养了两只狗，所以每天我都会带它们去附近的公园散步。", "tokens": ["因为", "我", "家里", "养了", "两只", "狗，", "所以", "每天", "我", "都会", "带", "它们", "去", "附近", "的", "公园", "散步。"], "token_readings": [], "reading": "Yīnwèi wǒ jiālǐ yǎng le liǎng zhī gǒu, suǒyǐ měitiān wǒ dōu huì dài tāmen qù fùjìn de gōngyuán sànbù."}, {"id": "p3", "lid": "2026-11-19-zh", "lang": "zh", "date": "2026-11-19", "ko": "예전과 비교하면 변화가 정말 큽니다.", "text": "跟以前相比，变化真的很大。", "tokens": ["跟", "以前", "相比，", "变化", "真的", "很大。"], "token_readings": [], "reading": "Gēn yǐqián xiāngbǐ, biànhuà zhēn de hěn dà."}, {"id": "p4", "lid": "2026-11-19-zh", "lang": "zh", "date": "2026-11-19", "ko": "그런데 지금은 다릅니다. 집이 지하철역 근처라서 어디든 지하철로 금방 갑니다.", "text": "但现在不一样了，我家就在地铁站附近，想去哪里坐地铁很快就到。", "tokens": ["但", "现在", "不一样了，", "我", "家", "就", "在", "地铁站", "附近，", "想", "去", "哪里", "坐", "地铁", "很快", "就", "到。"], "token_readings": [], "reading": "Dàn xiànzài bù yíyàng le, wǒ jiā jiù zài dìtiězhàn fùjìn, xiǎng qù nǎlǐ zuò dìtiě hěn kuài jiù dào."}, {"id": "p5", "lid": "2026-11-19-zh", "lang": "zh", "date": "2026-11-19", "ko": "그 호텔은 반려동물을 데리고 갈 수 있어서, 우리는 함께 아주 즐거운 시간을 보냈어요.", "text": "那家酒店可以带宠物，所以我们一起度过了非常开心的时光。", "tokens": ["那家", "酒店", "可以", "带", "宠物，", "所以", "我们", "一起", "度过了", "非常", "开心", "的", "时光。"], "token_readings": [], "reading": "Nà jiā jiǔdiàn kěyǐ dài chǒngwù, suǒyǐ wǒmen yìqǐ dùguò le fēicháng kāixīn de shíguāng."}, {"id": "p6", "lid": "2026-11-19-zh", "lang": "zh", "date": "2026-11-19", "ko": "우리는 커피를 마시고 쿠키를 먹으면서, 강아지 세 마리가 밖에서 자유롭게 노는 모습을 지켜봤어요.", "text": "我们一边喝着咖啡、吃着饼干，一边看着三只狗在外面自由自在地玩耍。", "tokens": ["我们", "一边", "喝着", "咖啡、", "吃着", "饼干，", "一边", "看着", "三只", "狗", "在", "外面", "自由自在", "地", "玩耍。"], "token_readings": [], "reading": "Wǒmen yìbiān hē zhe kāfēi, chī zhe bǐnggān, yìbiān kàn zhe sān zhī gǒu zài wàimiàn zìyóu zìzài de wánshuǎ."}, {"id": "p7", "lid": "2026-11-19-zh", "lang": "zh", "date": "2026-11-19", "ko": "그런데 최근에 감기 기운이 좀 있어서, 오늘 데리고 병원에 가서 진찰을 받게 할 생각입니다.", "text": "不过他最近有点感冒症状，所以我打算今天带他去医院看看，希望他能早日康复。", "tokens": ["不过", "他", "最近", "有点", "感冒", "症状，", "所以", "我", "打算", "今天", "带", "他", "去", "医院", "看看，", "希望", "他", "能", "早日", "康复。"], "token_readings": [], "reading": "Búguò tā zuìjìn yǒudiǎn gǎnmào zhèngzhuàng, suǒyǐ wǒ dǎsuàn jīntiān dài tā qù yīyuàn kànkan, xīwàng tā néng zǎorì kāngfù."}, {"id": "p8", "lid": "2026-11-18-en", "lang": "en", "date": "2026-11-18", "ko": "학생들 기말고사가 다가와서 이번 주는 정말 바빴어요.", "text": "It's been a busy week for me because my students have their final exams coming up.", "tokens": ["It's", "been", "a", "busy", "week", "for", "me", "because", "my", "students", "have", "their", "final", "exams", "coming", "up."], "token_readings": [], "reading": ""}, {"id": "p9", "lid": "2026-11-18-en", "lang": "en", "date": "2026-11-18", "ko": "저는 약 스물다섯 명의 학생에게 영어, 과학, 수학을 가르쳐요.", "text": "I teach English, science, and math to about twenty-five students.", "tokens": ["I", "teach", "English,", "science,", "and", "math", "to", "about", "twenty-five", "students."], "token_readings": [], "reading": ""}, {"id": "p10", "lid": "2026-11-18-en", "lang": "en", "date": "2026-11-18", "ko": "저는 개발자가 아니지만, AI 도구로 다섯 시간 만에 이 앱을 만들었어요.", "text": "I'm not a developer, but I built it in about five hours with an AI tool.", "tokens": ["I'm", "not", "a", "developer,", "but", "I", "built", "it", "in", "about", "five", "hours", "with", "an", "AI", "tool."], "token_readings": [], "reading": ""}, {"id": "p11", "lid": "2026-11-18-en", "lang": "en", "date": "2026-11-18", "ko": "가끔 제 앱이 작동하지 못하게 만드는 버그를 발견했어요.", "text": "Sometimes I found bugs that stopped my app from working.", "tokens": ["Sometimes", "I", "found", "bugs", "that", "stopped", "my", "app", "from", "working."], "token_readings": [], "reading": ""}, {"id": "p12", "lid": "2026-11-18-en", "lang": "en", "date": "2026-11-18", "ko": "오늘 이따가 웨이트를 하러 헬스장에 갈 거예요.", "text": "Later today I'm going to the gym to lift weights.", "tokens": ["Later", "today", "I'm", "going", "to", "the", "gym", "to", "lift", "weights."], "token_readings": [], "reading": ""}, {"id": "p13", "lid": "2026-11-18-en", "lang": "en", "date": "2026-11-18", "ko": "운동을 좋아해서, 그게 제가 몸매를 유지하는 가장 좋은 방법이에요.", "text": "I love working out and it's the best way for me to stay in shape.", "tokens": ["I", "love", "working", "out", "and", "it's", "the", "best", "way", "for", "me", "to", "stay", "in", "shape."], "token_readings": [], "reading": ""}, {"id": "p14", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "오늘 제 컨디션이 아주 좋아서 온몸에 의욕이 넘칩니다.", "text": "今天我的状态特别好，整个人都充满了干劲儿。", "tokens": ["今天", "我的", "状态", "特别", "好，", "整个人", "都", "充满了", "干劲儿。"], "token_readings": [], "reading": "Jīntiān wǒ de zhuàngtài tèbié hǎo, zhěnggè rén dōu chōngmǎn le gànjìnr."}, {"id": "p15", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "점심을 먹고 나서 헬스장에 가서 근력 운동을 할 계획이에요.", "text": "中午吃完饭以后，我打算去健身房练肌肉。", "tokens": ["中午", "吃完饭", "以后，", "我", "打算", "去", "健身房", "练", "肌肉。"], "token_readings": [], "reading": "Zhōngwǔ chī wán fàn yǐhòu, wǒ dǎsuàn qù jiànshēnfáng liàn jīròu."}, {"id": "p16", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "저는 선생님이라서 매일 수업을 여러 개 해야 해요.", "text": "因为我是老师，每天都要上好几节课。", "tokens": ["因为", "我", "是", "老师，", "每天", "都", "要", "上", "好几节课。"], "token_readings": [], "reading": "Yīnwèi wǒ shì lǎoshī, měitiān dōu yào shàng hǎo jǐ jié kè."}, {"id": "p17", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "수업이 끝난 뒤에 운동을 하면 오히려 에너지가 더 넘친다고 느껴요.", "text": "上完课以后锻炼一下，反而觉得精力更足。", "tokens": ["上完课", "以后", "锻炼", "一下，", "反而", "觉得", "精力", "更足。"], "token_readings": [], "reading": "shàng wán kè yǐhòu duànliàn yíxià, fǎnfér juéde jīnglì gèng zú."}, {"id": "p18", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "또 최근에 AI로 많은 도구를 만들었어요. 예를 들어 학부모 상담용 프로그램이라든지 수업 자료 같은 것이죠.", "text": "另外，我最近用 AI 做了很多工具，比如给家长咨询用的程序，还有教学资料。", "tokens": ["另外，", "我", "最近", "用", "AI", "做了", "很多", "工具，", "比如", "给", "家长", "咨询", "用", "的", "程序，", "还有", "教学", "资料。"], "token_readings": [], "reading": "Lìngwài, wǒ zuìjìn yòng AI zuò le hěn duō gōngjù, bǐrú gěi jiāzhǎng zīxún yòng de chéngxù, hái yǒu jiàoxué zīliào."}, {"id": "p19", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "AI의 발전 속도는 정말 빠릅니다.", "text": "AI 的发展速度真的很快。", "tokens": ["AI", "的", "发展速度", "真的", "很快。"], "token_readings": [], "reading": "AI de fāzhǎn sùdù zhēn de hěn kuài."}, {"id": "p20", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "그 덕분에 수업 준비와 자료 제작 시간이 많이 줄고, 업무 효율이 높아졌습니다.", "text": "它让我备课和做资料的时间减少了很多，提高了工作效率。", "tokens": ["它", "让", "我", "备课", "和", "做", "资料", "的", "时间", "减少了", "很多，", "提高了", "工作", "效率。"], "token_readings": [], "reading": "tā ràng wǒ bèikè hé zuò zīliào de shíjiān jiǎnshǎo le hěn duō, tígāo le gōngzuò xiàolǜ."}, {"id": "p21", "lid": "2026-11-18-zh", "lang": "zh", "date": "2026-11-18", "ko": "하지만 AI는 하나의 도구일 뿐이고, 어떻게 합리적으로 사용하느냐가 핵심이라고 생각합니다.", "text": "不过我觉得，AI 只是一个工具，如何合理使用才是关键。", "tokens": ["不过", "我", "觉得，", "AI", "只是", "一个", "工具，", "如何", "合理", "使用", "才是", "关键。"], "token_readings": [], "reading": "Búguò wǒ juéde, AI zhǐshì yí gè gōngjù, rúhé hélǐ shǐyòng cái shì guānjiàn."}, {"id": "p22", "lid": "2026-11-18-ja", "lang": "ja", "date": "2026-11-18", "ko": "저는 BELLA입니다.", "text": "わたしは ベラ です。", "tokens": ["わたしは", "ベラ", "です。"], "token_readings": ["와타시와", "베라", "데스"], "reading": "와타시와 베라 데스"}, {"id": "p23", "lid": "2026-11-18-ja", "lang": "ja", "date": "2026-11-18", "ko": "저는 선생님입니다.", "text": "わたしは せんせい です。", "tokens": ["わたしは", "せんせい", "です。"], "token_readings": ["와타시와", "센세이", "데스"], "reading": "와타시와 센세이 데스"}, {"id": "p24", "lid": "2026-11-18-ja", "lang": "ja", "date": "2026-11-18", "ko": "저는 한국인입니다.", "text": "わたしは かんこくじん です。", "tokens": ["わたしは", "かんこくじん", "です。"], "token_readings": ["와타시와", "칸코쿠진", "데스"], "reading": "와타시와 칸코쿠진 데스"}, {"id": "p25", "lid": "2026-11-18-ja", "lang": "ja", "date": "2026-11-18", "ko": "커피를 좋아합니다.", "text": "コーヒーが すきです。", "tokens": ["コーヒーが", "すきです。"], "token_readings": ["코-히-가", "스키데스"], "reading": "코-히-가 스키데스"}, {"id": "p26", "lid": "2026-11-18-ja", "lang": "ja", "date": "2026-11-18", "ko": "커피와 음악을 좋아합니다.", "text": "コーヒーと おんがくが すきです。", "tokens": ["コーヒーと", "おんがくが", "すきです。"], "token_readings": ["코-히-토", "온가쿠가", "스키데스"], "reading": "코-히-토 온가쿠가 스키데스"}, {"id": "p27", "lid": "2026-11-18-ja", "lang": "ja", "date": "2026-11-18", "ko": "함께 힘내요.", "text": "いっしょに がんばりましょう。", "tokens": ["いっしょに", "がんばりましょう。"], "token_readings": ["잇쇼니", "간바리마쇼"], "reading": "잇쇼니 간바리마쇼"}]};
+
+const LANGS = {
+  en: { label: "영어", flag: "🇺🇸", code: "en-US", codes: ["en-US", "en-GB"] },
+  zh: { label: "중국어", flag: "🇨🇳", code: "zh-CN", codes: ["zh-CN", "zh-TW"] },
+  ja: { label: "일본어", flag: "🇯🇵", code: "ja-JP", codes: ["ja-JP"] }
+};
+const LANG_ORDER = ["en", "zh", "ja"];
+
+const TYPES = {
+  word: { label: "단어·표현", cls: "word" },
+  pattern: { label: "핵심 패턴", cls: "pattern" },
+  correction: { label: "오답→교정", cls: "correction" },
+  pronunciation: { label: "발음 교정", cls: "pronunciation" },
+  advanced: { label: "고급 표현", cls: "advanced" }
+};
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const MEMO_KEY = "opic-memo-v1";
+
+/* ---------- 암기 상태 저장 ---------- */
+let memo = {};
+let storageOk = true;
+try {
+  const raw = localStorage.getItem(MEMO_KEY);
+  memo = raw ? JSON.parse(raw) || {} : {};
+} catch (e) {
+  storageOk = false;
+}
+function saveMemo() {
+  try {
+    localStorage.setItem(MEMO_KEY, JSON.stringify(memo));
+  } catch (e) {
+    storageOk = false;
+    const w = document.getElementById("storageWarn");
+    if (w) w.classList.add("show");
+  }
+}
+function ekey(lesson, idx) { return lesson.id + "#" + idx; }
+function isMemorized(lesson, idx) { return !!memo[ekey(lesson, idx)]; }
+
+/* ---------- 유틸 ---------- */
+function esc(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+function pad2(n) { return (n < 10 ? "0" : "") + n; }
+function weekday(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  return isNaN(d.getTime()) ? "" : WEEKDAYS[d.getDay()];
+}
+function normalize(value) {
+  return String(value == null ? "" : value).toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function shortTopic(t) {
+  let s = String(t == null ? "" : t);
+  s = s.replace(/\([^)]*\)/g, "").replace(/\[[^\]]*\]/g, "").replace(/\s+/g, " ").trim();
+  if (!s) s = String(t);
+  return s.length > 20 ? s.slice(0, 19) + "…" : s;
+}
+
+/* ---------- 원어민 음성 듣기 (Web Speech API) ---------- */
+const TTS = {
+  supported: !!(window.speechSynthesis && typeof window.SpeechSynthesisUtterance !== "undefined"),
+  rate: 0.9,
+  active: null,
+  token: 0,
+  voices: [],
+  cache: {}
+};
+const TTS_RATE_KEY = "opic-tts-rate-v1";
+try {
+  const savedRate = parseFloat(localStorage.getItem(TTS_RATE_KEY));
+  if (savedRate === 0.75 || savedRate === 0.9 || savedRate === 1) TTS.rate = savedRate;
+} catch (e) {}
+
+function loadVoices() {
+  if (!TTS.supported) return;
+  try { TTS.voices = window.speechSynthesis.getVoices() || []; } catch (e) { TTS.voices = []; }
+  TTS.cache = {};
+}
+if (TTS.supported) {
+  loadVoices();
+  try { window.speechSynthesis.addEventListener("voiceschanged", loadVoices); } catch (e) {}
+}
+
+function scoreVoice(v, code, order) {
+  const vl = String(v.lang || "").replace("_", "-").toLowerCase();
+  const want = String(code || "").toLowerCase();
+  let score = 0;
+  if (vl === want) score += 20;
+  else if (vl.slice(0, 2) === want.slice(0, 2)) score += 8;
+  else return -1;
+  score += Math.max(0, 4 - order);
+  if (v.localService) score += 3;
+  if (/google|microsoft|natural|neural|samantha|kyoko|ting-ting|mei-jia|sin-ji|yuna|aria|jenny/i.test(v.name || "")) score += 2;
+  if (/compact|espeak|festival/i.test(v.name || "")) score -= 4;
+  return score;
+}
+
+/* 언어별로 쓸 수 있는 원어민 음성을 자동 선택 (en-US → en-GB, zh-CN → zh-TW, ja-JP) */
+function pickVoice(lang) {
+  if (!TTS.supported) return null;
+  if (Object.prototype.hasOwnProperty.call(TTS.cache, lang)) return TTS.cache[lang];
+  const codes = (LANGS[lang] || {}).codes || ["en-US"];
+  const voices = (TTS.voices && TTS.voices.length) ? TTS.voices : (window.speechSynthesis.getVoices() || []);
+  let best = null, bestScore = -1;
+  codes.forEach(function (code, order) {
+    voices.forEach(function (v) {
+      const sc = scoreVoice(v, code, order);
+      if (sc > bestScore) { bestScore = sc; best = v; }
+    });
+  });
+  TTS.cache[lang] = best;
+  return best;
+}
+
+function ttsUtterance(text, lang) {
+  const u = new SpeechSynthesisUtterance(text);
+  const v = pickVoice(lang);
+  if (v) { u.voice = v; u.lang = v.lang; }
+  else { u.lang = (LANGS[lang] || {}).code || "en-US"; }
+  u.rate = TTS.rate;
+  u.pitch = 1;
+  return u;
+}
+
+function ttsClearActive() {
+  if (TTS.active && TTS.active.el) {
+    const el = TTS.active.el;
+    el.classList.remove("playing");
+    el.setAttribute("aria-pressed", "false");
+    const ic = el.querySelector(".ic");
+    if (ic) ic.textContent = "🔊";
+  }
+  TTS.active = null;
+}
+
+function ttsStop() {
+  TTS.token += 1;
+  if (TTS.supported) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+  ttsClearActive();
+}
+
+function ttsMark(el) {
+  ttsClearActive();
+  const token = ++TTS.token;
+  TTS.active = { el: el, token: token };
+  el.classList.add("playing");
+  el.setAttribute("aria-pressed", "true");
+  const ic = el.querySelector(".ic");
+  if (ic) ic.textContent = "⏹";
+  return token;
+}
+
+function ttsSpeakOne(text, lang, el) {
+  const token = ttsMark(el);
+  let u;
+  try { u = ttsUtterance(text, lang); } catch (e) { ttsStop(); return; }
+  const done = function () { if (TTS.active && TTS.active.token === token) ttsClearActive(); };
+  u.onend = done;
+  u.onerror = done;
+  try { window.speechSynthesis.speak(u); } catch (e) { ttsStop(); }
+}
+
+function ttsSpeakSeq(lines, lang, el) {
+  const token = ttsMark(el);
+  let i = 0;
+  const step = function () {
+    if (!TTS.active || TTS.active.token !== token) return;
+    if (i >= lines.length) { ttsClearActive(); return; }
+    let u;
+    try { u = ttsUtterance(lines[i++], lang); } catch (e) { ttsClearActive(); return; }
+    u.onend = step;
+    u.onerror = function () { if (TTS.active && TTS.active.token === token) ttsClearActive(); };
+    try { window.speechSynthesis.speak(u); } catch (e) { ttsClearActive(); }
+  };
+  step();
+}
+
+let toastTimer = null;
+function toast(msg) {
+  let t = document.getElementById("toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "toast"; t.className = "toast";
+    t.setAttribute("role", "status");
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2800);
+}
+
+function readingLabel(lang) {
+  return lang === "zh" ? "병음" : lang === "ja" ? "한국어 발음" : "발음";
+}
+
+/* text=읽을 문장, lang=en|zh|ja, cls=추가 클래스, asSpan=버튼 안에 넣을 때, label=아이콘 옆 글자 */
+function ttsBtn(text, lang, cls, asSpan, label) {
+  const tag = asSpan ? "span" : "button";
+  const attr = asSpan ? ' role="button" tabindex="-1"' : ' type="button"';
+  return "<" + tag + attr + ' class="tts' + (cls ? " " + cls : "") + '" data-tts="' + esc(text) + '" data-ttsl="' + esc(lang) +
+    '" aria-label="원어민 발음 듣기" aria-pressed="false" title="원어민 발음 듣기"><span class="ic">🔊</span>' +
+    (label ? " <span class=\"tts-lbl\">" + esc(label) + "</span>" : "") + "</" + tag + ">";
+}
+
+/* 문장·표현을 눌러도 재생되도록 (캡처 단계에서 다른 클릭 동작보다 먼저 처리) */
+document.addEventListener("click", function (ev) {
+  const el = ev.target.closest ? ev.target.closest("[data-tts],[data-tts-seq]") : null;
+  if (!el) return;
+  if (ev.target.closest("input, textarea, select")) return;
+  // 문장 자체를 눌렀을 때만: 드래그로 선택·복사하는 중이면 재생하지 않음
+  if (el.classList.contains("tts-text")) {
+    const sel = window.getSelection ? window.getSelection() : null;
+    if (sel && String(sel).length > 0) return;
+  }
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (!TTS.supported) {
+    toast("이 브라우저에서는 소리 재생(음성 합성)을 지원하지 않아요. Chrome·Safari 최신 버전에서 열어 주세요.");
+    return;
+  }
+  if (TTS.active && TTS.active.el === el) { ttsStop(); return; } // 재클릭 → 중지
+  try { window.speechSynthesis.cancel(); } catch (e) {}
+  const lang = el.getAttribute("data-ttsl") || "en";
+  const seqId = el.getAttribute("data-tts-seq");
+  if (seqId) {
+    const lesson = byId[seqId];
+    if (!lesson) return;
+    const lines = [];
+    ((lesson.model_answer && lesson.model_answer.blocks) || []).forEach(function (b) {
+      (b.lines || []).forEach(function (ln) { if (ln.text) lines.push(ln.text); });
+    });
+    if (!lines.length) return;
+    ttsSpeakSeq(lines, lesson.lang, el);
+    return;
+  }
+  const text = el.getAttribute("data-tts") || "";
+  if (!text.trim()) return;
+  ttsSpeakOne(text, lang, el);
+}, true);
+
+function setRate(rate) {
+  TTS.rate = rate;
+  try { localStorage.setItem(TTS_RATE_KEY, String(rate)); } catch (e) {}
+  document.querySelectorAll("#segRate .spd").forEach(function (b) {
+    const on = parseFloat(b.getAttribute("data-rate")) === rate;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  if (TTS.active && TTS.active.el) {
+    const el = TTS.active.el;
+    const lang = el.getAttribute("data-ttsl") || "en";
+    const seqId = el.getAttribute("data-tts-seq");
+    const text = el.getAttribute("data-tts") || "";
+    ttsStop();
+    if (!TTS.supported) return;
+    if (seqId) {
+      const lesson = byId[seqId];
+      if (!lesson) return;
+      const lines = [];
+      ((lesson.model_answer && lesson.model_answer.blocks) || []).forEach(function (b) {
+        (b.lines || []).forEach(function (ln) { if (ln.text) lines.push(ln.text); });
+      });
+      if (lines.length) ttsSpeakSeq(lines, lesson.lang, el);
+    } else if (text) {
+      ttsSpeakOne(text, lang, el);
+    }
+  }
+}
+
+function initRateUI() {
+  document.querySelectorAll("#segRate .spd").forEach(function (b) {
+    const on = parseFloat(b.getAttribute("data-rate")) === TTS.rate;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.addEventListener("click", function () { setRate(parseFloat(b.getAttribute("data-rate"))); });
+  });
+}
+
+/* ---------- 데이터 ---------- */
+const lessons = (DATA.lessons || []).slice().sort(function (a, b) {
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  return (a.order || 0) - (b.order || 0);
+});
+const byId = {};
+lessons.forEach(function (l) { byId[l.id] = l; });
+
+const PRACTICE = (DATA.practice || []).slice().sort(function (a, b) {
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  return a.lang < b.lang ? -1 : a.lang > b.lang ? 1 : 0;
+});
+
+/* 표현 전체 목록 */
+const ALL_EXPRS = [];
+lessons.forEach(function (l) {
+  (l.expressions || []).forEach(function (e, i) {
+    ALL_EXPRS.push({ lesson: l, expr: e, idx: i });
+  });
+});
+
+/* 표현 원문 → 발음(병음·한국어 발음) — 퀴즈 오답 보기의 발음까지 보여 주려고 */
+const READING_BY_TEXT = {};
+lessons.forEach(function (l) {
+  (l.expressions || []).forEach(function (e) {
+    if (e.reading) READING_BY_TEXT[l.lang + "|" + e.text] = e.reading;
+  });
+  ((l.model_answer && l.model_answer.blocks) || []).forEach(function (b) {
+    (b.lines || []).forEach(function (ln) {
+      if (ln.reading) READING_BY_TEXT[l.lang + "|" + ln.text] = ln.reading;
+    });
+  });
+});
+function readingFor(lang, text) {
+  return READING_BY_TEXT[lang + "|" + text] || "";
+}
+
+/* ---------- 통계 ---------- */
+function memoRate(lesson) {
+  const total = (lesson.expressions || []).length;
+  let done = 0;
+  (lesson.expressions || []).forEach(function (e, i) { if (isMemorized(lesson, i)) done += 1; });
+  return { done: done, total: total, pct: total ? Math.round((done / total) * 100) : 0 };
+}
+
+function updateStats() {
+  const counts = { en: 0, zh: 0, ja: 0 };
+  let total = 0, done = 0, topicCount = 0;
+  lessons.forEach(function (l) {
+    if (counts[l.lang] !== undefined) counts[l.lang] += 1;
+    topicCount += (l.topics || []).length;
+    (l.expressions || []).forEach(function (e, i) {
+      total += 1;
+      if (isMemorized(l, i)) done += 1;
+    });
+  });
+  document.getElementById("s-lessons").textContent = lessons.length;
+  document.getElementById("s-en").textContent = counts.en;
+  document.getElementById("s-zh").textContent = counts.zh;
+  document.getElementById("s-ja").textContent = counts.ja;
+  document.getElementById("s-expr").textContent = total;
+  document.getElementById("s-done").textContent = done;
+  const rate = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById("s-rate").textContent = rate + "%";
+  document.getElementById("s-bar").style.width = rate + "%";
+
+  document.getElementById("c-all").textContent = lessons.length;
+  document.getElementById("c-en").textContent = counts.en;
+  document.getElementById("c-zh").textContent = counts.zh;
+  document.getElementById("c-ja").textContent = counts.ja;
+  document.getElementById("v-lesson-count").textContent = lessons.length;
+  document.getElementById("v-topic-count").textContent = topicCount;
+
+  const last = lessons.length ? lessons[0].date : "";
+  document.getElementById("footInfo").textContent =
+    "수업 " + lessons.length + "건 · 주제 " + topicCount + "개 · 문장 연습 " + PRACTICE.length + "개 · 최근 수업 " + (last || "-") +
+    (DATA.meta && DATA.meta.updated ? " · 데이터 갱신 " + DATA.meta.updated : "");
+}
+
+/* ---------- 뷰 전환 ---------- */
+const state = { view: "calendar", listLang: "all", q: "", onlyUnmem: false };
+
+function showView(name) {
+  state.view = name;
+  document.querySelectorAll(".view").forEach(function (v) {
+    v.classList.toggle("active", v.id === "view-" + name);
+  });
+  document.querySelectorAll(".vtab").forEach(function (t) {
+    const on = t.getAttribute("data-view") === name;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (name === "calendar") renderCalendar();
+  if (name === "topics") renderTopics();
+  if (name === "list") renderList();
+  if (name === "game" && !session) newSession(game.mode);
+}
+
+/* ---------- 모달 ---------- */
+let lastFocus = null;
+function openModal(title, sub, html, lang) {
+  lastFocus = document.activeElement;
+  const modal = document.getElementById("modal");
+  const body = document.getElementById("modalBody");
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("modalSub").textContent = sub || "";
+  body.innerHTML = '<div class="m-card"' + (lang ? ' data-lang="' + esc(lang) + '"' : "") + ">" + html + "</div>";
+  modal.hidden = false;
+  modal.classList.add("open");
+  document.body.classList.add("modal-open");
+  body.scrollTop = 0;
+  const btn = document.getElementById("modalClose");
+  if (btn) btn.focus();
+}
+function closeModal() {
+  const modal = document.getElementById("modal");
+  modal.classList.remove("open");
+  modal.hidden = true;
+  document.body.classList.remove("modal-open");
+  if (lastFocus && lastFocus.focus) { try { lastFocus.focus(); } catch (e) {} }
+}
+document.getElementById("modalClose").addEventListener("click", closeModal);
+document.querySelector(".modal-back").addEventListener("click", closeModal);
+document.addEventListener("keydown", function (ev) {
+  if (ev.key === "Escape" && document.getElementById("modal").classList.contains("open")) closeModal();
+});
+
+function exprHTML(lesson, expr, idx, compact) {
+  const t = TYPES[expr.type] || { label: "표현", cls: "word" };
+  const key = ekey(lesson, idx);
+  const done = !!memo[key];
+  let html = '<li class="expr-item' + (done ? " done" : "") + '">';
+  html += "<label>";
+  html += '<input type="checkbox" data-ekey="' + esc(key) + '" data-lid="' + esc(lesson.id) + '"' + (done ? " checked" : "") + ">";
+  html += '<span class="box" aria-hidden="true"></span>';
+  html += '<span class="expr-body">';
+  html += '<span class="expr-top"><span class="tag ' + t.cls + '">' + esc(t.label) + "</span>";
+  html += '<span class="expr-text tts-text" data-tts="' + esc(expr.text) + '" data-ttsl="' + esc(lesson.lang) + '" title="눌러서 원어민 발음 듣기">' + esc(expr.text) + "</span>";
+  html += ttsBtn(expr.text, lesson.lang, "sm");
+  html += "</span>";
+  if (expr.reading) html += '<span class="expr-reading">' + esc(readingLabel(lesson.lang)) + " " + esc(expr.reading) + "</span>";
+  if (expr.ko) html += '<span class="expr-ko">' + esc(expr.ko) + "</span>";
+  if (!compact && expr.wrong) html += '<span class="expr-wrong">✗ ' + esc(expr.wrong) + "</span>";
+  if (!compact && expr.note) html += '<span class="expr-note">→ ' + esc(expr.note) + "</span>";
+  html += "</span></label></li>";
+  return html;
+}
+
+function answerHTML(lesson) {
+  const blocks = (lesson.model_answer && lesson.model_answer.blocks) || [];
+  let html = "";
+  if (lesson.model_answer && lesson.model_answer.note) {
+    html += '<p class="ans-note">' + esc(lesson.model_answer.note) + "</p>";
+  }
+  blocks.forEach(function (b) {
+    html += '<div class="ans-block">';
+    if (b.heading) html += "<h4>" + esc(b.heading) + "</h4>";
+    if (b.note) html += '<p class="ans-note">' + esc(b.note) + "</p>";
+    (b.lines || []).forEach(function (ln) {
+      html += '<div class="ans-line">';
+      html += '<div class="ans-row">';
+      html += '<p class="ans-text tts-text" data-tts="' + esc(ln.text) + '" data-ttsl="' + esc(lesson.lang) + '" title="눌러서 원어민 발음 듣기">' + esc(ln.text) + "</p>";
+      html += ttsBtn(ln.text, lesson.lang);
+      html += "</div>";
+      if (ln.reading) {
+        html += '<p class="ans-reading">';
+        if (lesson.lang === "ja") html += '<span class="rl">한국어 발음</span>';
+        html += esc(ln.reading) + "</p>";
+      }
+      if (ln.ko) html += '<p class="ans-ko">' + esc(ln.ko) + "</p>";
+      html += "</div>";
+    });
+    html += "</div>";
+  });
+  return html;
+}
+
+function answerPlainText(lesson) {
+  const lang = LANGS[lesson.lang] || { label: "" };
+  const lines = [lesson.title, lesson.date + " · " + lang.label + (lesson.level ? " (" + lesson.level + ")" : ""), ""];
+  const blocks = (lesson.model_answer && lesson.model_answer.blocks) || [];
+  blocks.forEach(function (b) {
+    if (b.heading) lines.push("[" + b.heading + "]");
+    (b.lines || []).forEach(function (ln) {
+      lines.push(ln.text || "");
+      if (ln.reading) lines.push(ln.reading);
+      if (ln.ko) lines.push("→ " + ln.ko);
+      lines.push("");
+    });
+  });
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function lessonModalHTML(lesson) {
+  const lang = LANGS[lesson.lang] || { label: lesson.lang, flag: "" };
+  const r = memoRate(lesson);
+  let html = '<div class="m-meta">';
+  html += '<span class="date">' + esc(lesson.date) + ' <span class="wd">(' + esc(weekday(lesson.date)) + ")</span></span>";
+  html += '<span class="badge">' + esc(lang.flag + " " + lang.label) + "</span>";
+  if (lesson.level) html += '<span class="level">' + esc(lesson.level) + "</span>";
+  if (lesson.session) html += '<span class="session">' + esc(lesson.session) + "</span>";
+  html += "</div>";
+
+  if ((lesson.topics || []).length) {
+    html += '<div class="m-topics">';
+    lesson.topics.forEach(function (t) { html += '<span class="chip">' + esc(t) + "</span>"; });
+    html += "</div>";
+  }
+
+  html += '<div class="m-tools">';
+  html += '<button class="mini" data-tts-seq="' + esc(lesson.id) + '" data-ttsl="' + esc(lesson.lang) + '" aria-pressed="false"><span class="ic">🔊</span> 모범답안 전체 듣기</button>';
+  if (lesson.lang === "zh") html += '<button class="mini" data-mact="pinyin">병음 숨기기</button>';
+  html += '<button class="mini" data-mact="copy">모범답안 복사</button>';
+  html += '<button class="mini" data-mact="close">닫기</button>';
+  html += "</div>";
+
+  html += '<div class="m-answer">' + answerHTML(lesson) + "</div>";
+
+  html += '<div class="expr-head"><h4>외워야 할 표현</h4><span class="expr-progress" data-prog="' + esc(lesson.id) + '"><b>' + r.done + "</b> / " + r.total + " 암기</span></div>";
+  html += '<div class="mini-bar"><div style="width:' + r.pct + '%"></div></div>';
+  html += '<ul class="expr-list">';
+  (lesson.expressions || []).forEach(function (e, i) { html += exprHTML(lesson, e, i, false); });
+  html += "</ul>";
+  return html;
+}
+
+function openLesson(lid) {
+  const l = byId[lid];
+  if (!l) return;
+  const lang = LANGS[l.lang] || { label: l.lang, flag: "" };
+  document.getElementById("modal").setAttribute("data-lid", lid);
+  openModal(l.title, l.date + " (" + weekday(l.date) + ") · " + lang.label + (l.level ? " · " + l.level : ""), lessonModalHTML(l), l.lang);
+}
+
+function openDay(dateStr) {
+  const list = lessons.filter(function (l) { return l.date === dateStr; });
+  let html = "";
+  if (!list.length) {
+    html = '<p class="m-empty">이 날은 수업 기록이 없습니다.</p>';
+  } else {
+    html += '<p class="m-empty" style="padding-top:0">이 날 공부한 주제입니다. 주제를 누르면 그 수업 전체가 열립니다.</p><ul class="day-list">';
+    list.forEach(function (l) {
+      const lang = LANGS[l.lang] || { label: l.lang, flag: "" };
+      html += "<li>";
+      html += '<div class="day-lang ' + esc(l.lang) + '">' + esc(lang.flag + " " + lang.label) + (l.level ? " · " + esc(l.level) : "") + "</div>";
+      (l.topics || []).forEach(function (t) {
+        html += '<button class="day-topic" data-lid="' + esc(l.id) + '">' + esc(t) + "</button>";
+      });
+      html += "</li>";
+    });
+    html += "</ul>";
+  }
+  const d = new Date(dateStr + "T00:00:00");
+  const title = (isNaN(d.getTime()) ? dateStr : (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + WEEKDAYS[d.getDay()] + ")");
+  document.getElementById("modal").removeAttribute("data-lid");
+  openModal(title, "수업 " + list.length + "건", html, "");
+}
+
+/* ---------- 1. 달력 ---------- */
+const cal = { y: 0, m: 0 };
+(function initCal() {
+  const now = new Date();
+  let y = now.getFullYear(), m = now.getMonth();
+  const hasThisMonth = lessons.some(function (l) {
+    const d = new Date(l.date + "T00:00:00");
+    return d.getFullYear() === y && d.getMonth() === m;
+  });
+  if (!hasThisMonth && lessons.length) {
+    const d0 = new Date(lessons[0].date + "T00:00:00");
+    if (!isNaN(d0.getTime())) { y = d0.getFullYear(); m = d0.getMonth(); }
+  }
+  cal.y = y; cal.m = m;
+})();
+
+function lessonsOn(dateStr) {
+  return lessons.filter(function (l) { return l.date === dateStr; });
+}
+
+function renderCalendar() {
+  const y = cal.y, m = cal.m;
+  document.getElementById("calTitle").childNodes[0].nodeValue = y + "년 " + (m + 1) + "월";
+
+  const monthLessons = lessons.filter(function (l) {
+    const d = new Date(l.date + "T00:00:00");
+    return d.getFullYear() === y && d.getMonth() === m;
+  });
+  const monthTopics = monthLessons.reduce(function (n, l) { return n + (l.topics || []).length; }, 0);
+  document.getElementById("calSummary").textContent = "수업 " + monthLessons.length + "건 · 주제 " + monthTopics + "개";
+
+  const first = new Date(y, m, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prevMonthDays = new Date(y, m, 0).getDate();
+  const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
+  const todayStr = (function () {
+    const t = new Date();
+    return t.getFullYear() + "-" + pad2(t.getMonth() + 1) + "-" + pad2(t.getDate());
+  })();
+
+  const cells = [];
+  for (let i = 0; i < totalCells; i++) {
+    let dy = y, dm = m, dd, out = false;
+    if (i < startDow) {
+      dd = prevMonthDays - startDow + 1 + i;
+      dm = m - 1;
+      out = true;
+      if (dm < 0) { dm = 11; dy = y - 1; }
+    } else if (i >= startDow + daysInMonth) {
+      dd = i - (startDow + daysInMonth) + 1;
+      dm = m + 1;
+      out = true;
+      if (dm > 11) { dm = 0; dy = y + 1; }
+    } else {
+      dd = i - startDow + 1;
+    }
+    const dstr = dy + "-" + pad2(dm + 1) + "-" + pad2(dd);
+    const dayLessons = lessonsOn(dstr);
+
+    let chips = "", dots = "";
+    const perLesson = dayLessons.map(function (l) {
+      return (l.topics || []).map(function (t, ti) { return { lesson: l, topic: t, ti: ti }; });
+    });
+    const flat = [];
+    const maxDepth = perLesson.reduce(function (n, a) { return Math.max(n, a.length); }, 0);
+    for (let depth = 0; depth < maxDepth; depth++) {
+      perLesson.forEach(function (a) { if (a[depth]) flat.push(a[depth]); });
+    }
+    const MAX_CHIPS = 6;
+    flat.slice(0, MAX_CHIPS).forEach(function (it) {
+      const l = it.lesson;
+      chips += '<button class="ctag ' + esc(l.lang) + '" data-lid="' + esc(l.id) + '" data-ti="' + it.ti +
+        '" title="' + esc((LANGS[l.lang] ? LANGS[l.lang].label : l.lang) + " · " + it.topic) + '">' + esc(shortTopic(it.topic)) + "</button>";
+    });
+    if (flat.length > MAX_CHIPS) {
+      chips += '<button class="ctag more" data-day="' + esc(dstr) + '" title="이날 주제 모두 보기">+' + (flat.length - MAX_CHIPS) + "</button>";
+    }
+    dayLessons.forEach(function (l) { dots += '<i class="cdot ' + esc(l.lang) + '"></i>'; });
+
+    let cls = "cal-cell";
+    if (out) cls += " out";
+    if (dstr === todayStr) cls += " is-today";
+    if (dayLessons.length) cls += " has-lessons";
+
+    let html = '<div class="' + cls + '" data-date="' + esc(dstr) + '">';
+    html += '<button class="cal-num" data-day="' + esc(dstr) + '" aria-label="' + esc((dm + 1) + "월 " + dd + "일 주제 보기") + '">' + dd + "</button>";
+    if (chips) html += '<div class="cal-chips">' + chips + "</div>";
+    if (dots) html += '<button class="cal-dots" data-day="' + esc(dstr) + '" aria-label="' + esc((dm + 1) + "월 " + dd + "일 주제 보기") + '">' + dots + "</button>";
+    html += "</div>";
+    cells.push(html);
+  }
+  document.getElementById("calGrid").innerHTML = cells.join("");
+
+  // 이 달의 주제 (날짜별 이름 목록 — 휴대폰에서도 주제 이름을 그대로 볼 수 있게)
+  const listWrap = document.getElementById("calList");
+  const monthSorted = monthLessons.slice().sort(function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return (a.order || 0) - (b.order || 0);
+  });
+  if (!monthSorted.length) {
+    listWrap.innerHTML = '<p class="sec-empty">이 달에는 아직 수업 기록이 없습니다.</p>';
+    return;
+  }
+  let listHtml = '<h3 class="cal-list-title">이 달의 주제 <span>날짜별 · 누르면 수업 내용이 열립니다</span></h3>';
+  const byDate = {};
+  monthSorted.forEach(function (l) { (byDate[l.date] = byDate[l.date] || []).push(l); });
+  Object.keys(byDate).sort().forEach(function (dstr) {
+    const dd = new Date(dstr + "T00:00:00");
+    listHtml += '<div class="cld"><div class="cld-date">' + esc((dd.getMonth() + 1) + "월 " + dd.getDate() + "일 (" + WEEKDAYS[dd.getDay()] + ")") + "</div>";
+    listHtml += '<div class="cld-topics">';
+    byDate[dstr].forEach(function (l) {
+      (l.topics || []).forEach(function (t) {
+        listHtml += '<button class="ctag ctag-lg ' + esc(l.lang) + '" data-lid="' + esc(l.id) + '" title="' + esc((LANGS[l.lang] ? LANGS[l.lang].label : l.lang) + " · " + t) + '">' + esc(t) + "</button>";
+      });
+    });
+    listHtml += "</div></div>";
+  });
+  listWrap.innerHTML = listHtml;
+}
+
+document.getElementById("calGrid").addEventListener("click", function (ev) {
+  const chip = ev.target.closest("button.ctag[data-lid]");
+  if (chip) { openLesson(chip.getAttribute("data-lid")); return; }
+  const dayBtn = ev.target.closest("button[data-day]");
+  if (dayBtn) { openDay(dayBtn.getAttribute("data-day")); return; }
+});
+document.getElementById("calList").addEventListener("click", function (ev) {
+  const chip = ev.target.closest("button.ctag[data-lid]");
+  if (chip) openLesson(chip.getAttribute("data-lid"));
+});
+document.getElementById("calPrev").addEventListener("click", function () {
+  cal.m -= 1; if (cal.m < 0) { cal.m = 11; cal.y -= 1; }
+  renderCalendar();
+});
+document.getElementById("calNext").addEventListener("click", function () {
+  cal.m += 1; if (cal.m > 11) { cal.m = 0; cal.y += 1; }
+  renderCalendar();
+});
+document.getElementById("calToday").addEventListener("click", function () {
+  const t = new Date();
+  cal.y = t.getFullYear(); cal.m = t.getMonth();
+  renderCalendar();
+});
+
+/* ---------- 2. 주제 누적 ---------- */
+function renderTopics() {
+  const body = document.getElementById("topicsBody");
+  let html = "";
+  LANG_ORDER.forEach(function (lang) {
+    const info = LANGS[lang];
+    const list = lessons.filter(function (l) { return l.lang === lang; });
+    let topicN = 0, exprN = 0, doneN = 0;
+    list.forEach(function (l) {
+      topicN += (l.topics || []).length;
+      const r = memoRate(l);
+      exprN += r.total; doneN += r.done;
+    });
+    const pct = exprN ? Math.round((doneN / exprN) * 100) : 0;
+
+    html += '<section class="topic-sec" data-lang="' + esc(lang) + '">';
+    html += '<div class="topic-sec-head"><h3><i class="dot ' + esc(lang) + '"></i>' + esc(info.flag + " " + info.label) + "</h3>";
+    html += "<p>수업 " + list.length + "건 · 주제 " + topicN + "개 · 표현 " + exprN + "개 · 암기 " + pct + "%</p></div>";
+
+    if (!list.length) {
+      html += '<p class="sec-empty">아직 기록이 없습니다.</p></section>';
+      return;
+    }
+
+    let rows = "";
+    list.forEach(function (l) {
+      const r = memoRate(l);
+      (l.topics || []).forEach(function (t) {
+        rows += '<button class="topic-row" data-lid="' + esc(l.id) + '">';
+        rows += '<span class="tlang ' + esc(lang) + '">' + esc(l.date.slice(5)) + "</span>";
+        rows += '<span class="tname">' + esc(t) + "</span>";
+        rows += '<span class="tmeta">표현 <b>' + r.total + "</b>개 · 암기 <b>" + r.pct + "%</b>" +
+          '<span class="rate"><span style="width:' + r.pct + '%"></span></span></span>';
+        rows += "</button>";
+      });
+    });
+    html += rows + "</section>";
+  });
+  body.innerHTML = html;
+}
+
+document.getElementById("topicsBody").addEventListener("click", function (ev) {
+  const row = ev.target.closest("button.topic-row[data-lid]");
+  if (row) openLesson(row.getAttribute("data-lid"));
+});
+
+/* ---------- 3. 수업 목록 ---------- */
+const openMap = {};
+lessons.forEach(function (l, i) { openMap[l.id] = false; });
+
+function haystack(lesson) {
+  const parts = [lesson.title, lesson.level, lesson.session || "", lesson.date, (lesson.topics || []).join(" ")];
+  const blocks = (lesson.model_answer && lesson.model_answer.blocks) || [];
+  blocks.forEach(function (b) {
+    parts.push(b.heading || "", b.note || "");
+    (b.lines || []).forEach(function (ln) { parts.push(ln.text || "", ln.reading || "", ln.ko || ""); });
+  });
+  (lesson.expressions || []).forEach(function (e) {
+    parts.push(e.text || "", e.reading || "", e.ko || "", e.wrong || "", e.note || "");
+  });
+  (lesson.practice || []).forEach(function (p) { parts.push(p.text || "", p.ko || ""); });
+  return normalize(parts.join(" "));
+}
+function matchesQuery(lesson, q) {
+  if (!q) return true;
+  const h = haystack(lesson);
+  if (h.indexOf(q) !== -1) return true;
+  const compact = q.replace(/\s+/g, "");
+  return compact.length > 0 && h.replace(/\s+/g, "").indexOf(compact) !== -1;
+}
+
+function cardHTML(lesson, visible) {
+  const lang = LANGS[lesson.lang] || { label: lesson.lang, flag: "" };
+  const all = lesson.expressions || [];
+  const r = memoRate(lesson);
+  const isOpen = !!openMap[lesson.id];
+
+  let html = '<article class="card" data-lang="' + esc(lesson.lang) + '" data-id="' + esc(lesson.id) + '">';
+  html += '<div class="meta">';
+  html += '<span class="date">' + esc(lesson.date) + ' <span class="wd">(' + esc(weekday(lesson.date)) + ")</span></span>";
+  html += '<span class="badge">' + esc(lang.label) + "</span>";
+  if (lesson.level) html += '<span class="level">' + esc(lesson.level) + "</span>";
+  if (lesson.session) html += '<span class="session">' + esc(lesson.session) + "</span>";
+  html += "</div>";
+  html += '<h3 class="card-title">' + esc(lesson.title) + "</h3>";
+  if ((lesson.topics || []).length) {
+    html += '<div class="topics">';
+    lesson.topics.forEach(function (t) { html += '<span class="chip">' + esc(t) + "</span>"; });
+    html += "</div>";
+  }
+  html += '<div class="answer-head">';
+  html += '<button class="answer-toggle' + (isOpen ? " open" : "") + '" data-act="toggle" aria-expanded="' + (isOpen ? "true" : "false") + '">모범답안 ' + (isOpen ? "접기" : "보기") + ' <span class="caret">▼</span></button>';
+  html += '<div class="answer-tools">';
+  html += '<button class="mini" data-tts-seq="' + esc(lesson.id) + '" data-ttsl="' + esc(lesson.lang) + '" aria-pressed="false"><span class="ic">🔊</span> 전체 듣기</button>';
+  if (lesson.lang === "zh") html += '<button class="mini" data-act="pinyin">병음 숨기기</button>';
+  html += '<button class="mini" data-act="copy">원문 복사</button>';
+  html += '<button class="mini" data-act="open">자세히</button>';
+  html += "</div></div>";
+  html += '<div class="answer-wrap' + (isOpen ? " open" : "") + '">' + answerHTML(lesson) + "</div>";
+
+  const remainText = state.onlyUnmem ? ' <span style="color:#9ca3af;font-weight:500">' + visible.length + "개 남음</span>" : "";
+  html += '<div class="expr-head"><h4>외워야 할 표현' + remainText + "</h4>";
+  html += '<span class="expr-progress"><b>' + r.done + "</b> / " + r.total + " 암기</span></div>";
+  html += '<div class="mini-bar"><div style="width:' + r.pct + '%"></div></div>';
+  html += '<ul class="expr-list">';
+  visible.forEach(function (item) { html += exprHTML(lesson, item.expr, item.idx, false); });
+  html += "</ul>";
+  html += "</article>";
+  return html;
+}
+
+function renderList() {
+  const q = normalize(state.q.trim());
+  const cards = [];
+  lessons.forEach(function (lesson) {
+    if (state.listLang !== "all" && lesson.lang !== state.listLang) return;
+    if (!matchesQuery(lesson, q)) return;
+    let visible = (lesson.expressions || []).map(function (e, i) { return { expr: e, idx: i }; });
+    if (state.onlyUnmem) {
+      visible = visible.filter(function (it) { return !isMemorized(lesson, it.idx); });
+      if (visible.length === 0) return;
+    }
+    cards.push(cardHTML(lesson, visible));
+  });
+  document.getElementById("list").innerHTML = cards.join("");
+  const empty = document.getElementById("empty");
+  empty.hidden = cards.length > 0;
+  document.getElementById("emptyText").textContent = state.onlyUnmem
+    ? "이 조건에서는 미암기 표현이 없습니다. 다 외우셨네요! 🎉"
+    : "조건에 맞는 수업이 없습니다. 검색어나 언어 탭을 바꿔 보세요.";
+}
+
+function copyText(text, btn) {
+  const done = function (ok) {
+    const original = btn.getAttribute("data-label") || btn.textContent;
+    btn.setAttribute("data-label", original);
+    btn.textContent = ok ? "복사됨 ✓" : "복사 실패";
+    setTimeout(function () { btn.textContent = original; }, 1500);
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(function () { done(true); }, function () { fallback(); });
+  } else { fallback(); }
+  function fallback() {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.top = "-1000px";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      done(ok);
+    } catch (e) { done(false); }
+  }
+}
+
+function refreshCardProgress(cardEl) {
+  const id = cardEl.getAttribute("data-id");
+  const lesson = byId[id];
+  if (!lesson) return;
+  const r = memoRate(lesson);
+  const prog = cardEl.querySelector(".expr-progress");
+  if (prog) prog.innerHTML = "<b>" + r.done + "</b> / " + r.total + " 암기";
+  const bar = cardEl.querySelector(".mini-bar > div");
+  if (bar) bar.style.width = r.pct + "%";
+}
+
+document.getElementById("list").addEventListener("click", function (ev) {
+  const btn = ev.target.closest("button[data-act]");
+  if (!btn) return;
+  const card = btn.closest(".card");
+  if (!card) return;
+  const id = card.getAttribute("data-id");
+  const lesson = byId[id];
+  const act = btn.getAttribute("data-act");
+
+  if (act === "toggle") {
+    openMap[id] = !openMap[id];
+    const wrap = card.querySelector(".answer-wrap");
+    if (wrap) wrap.classList.toggle("open", openMap[id]);
+    btn.classList.toggle("open", openMap[id]);
+    btn.setAttribute("aria-expanded", openMap[id] ? "true" : "false");
+    btn.innerHTML = "모범답안 " + (openMap[id] ? "접기" : "보기") + ' <span class="caret">▼</span>';
+  } else if (act === "pinyin") {
+    card.classList.toggle("hide-reading");
+    btn.textContent = card.classList.contains("hide-reading") ? "병음 보기" : "병음 숨기기";
+  } else if (act === "copy" && lesson) {
+    copyText(answerPlainText(lesson), btn);
+  } else if (act === "open" && lesson) {
+    openLesson(id);
+  }
+});
+
+function handleMemoChange(cb) {
+  const key = cb.getAttribute("data-ekey");
+  const lid = cb.getAttribute("data-lid");
+  if (cb.checked) memo[key] = true; else delete memo[key];
+  saveMemo();
+
+  const item = cb.closest(".expr-item");
+  if (item) item.classList.toggle("done", cb.checked);
+
+  const listCard = cb.closest(".card");
+  if (listCard && listCard.getAttribute("data-id")) refreshCardProgress(listCard);
+  const mProg = document.querySelector('[data-prog="' + lid + '"]');
+  if (mProg && byId[lid]) {
+    const r = memoRate(byId[lid]);
+    mProg.innerHTML = "<b>" + r.done + "</b> / " + r.total + " 암기";
+    const mCard = mProg.closest(".m-card");
+    const mBar = mCard ? mCard.querySelector(".mini-bar > div") : null;
+    if (mBar) mBar.style.width = r.pct + "%";
+  }
+  updateStats();
+  if (state.view === "list" && state.onlyUnmem && cb.checked) renderList();
+  if (state.view === "topics") renderTopics();
+}
+
+document.addEventListener("change", function (ev) {
+  const cb = ev.target;
+  if (!cb.matches('input[type="checkbox"][data-ekey]')) return;
+  handleMemoChange(cb);
+});
+
+document.querySelectorAll("#view-list .tab").forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    document.querySelectorAll("#view-list .tab").forEach(function (t) {
+      t.classList.remove("active");
+      t.setAttribute("aria-selected", "false");
+    });
+    tab.classList.add("active");
+    tab.setAttribute("aria-selected", "true");
+    state.listLang = tab.getAttribute("data-lang");
+    renderList();
+  });
+});
+
+let searchTimer = null;
+document.getElementById("search").addEventListener("input", function (ev) {
+  const value = ev.target.value;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function () { state.q = value; renderList(); }, 120);
+});
+document.getElementById("onlyUnmem").addEventListener("change", function (ev) {
+  state.onlyUnmem = ev.target.checked;
+  renderList();
+});
+document.getElementById("toggleAll").addEventListener("click", function (ev) {
+  const btn = ev.target;
+  const anyClosed = lessons.some(function (l) { return !openMap[l.id]; });
+  lessons.forEach(function (l) { openMap[l.id] = anyClosed; });
+  btn.textContent = anyClosed ? "모범답안 전체 접기" : "모범답안 전체 펼치기";
+  renderList();
+});
+
+/* ---------- 모달 안 상호작용 ---------- */
+document.getElementById("modal").addEventListener("click", function (ev) {
+  const t = ev.target.closest("[data-close]");
+  if (t) { closeModal(); return; }
+  const mact = ev.target.closest("button[data-mact]");
+  if (mact) {
+    const card = document.getElementById("modalBody").firstElementChild;
+    const act = mact.getAttribute("data-mact");
+    if (act === "close") { closeModal(); return; }
+    if (act === "pinyin" && card) {
+      card.classList.toggle("hide-reading");
+      mact.textContent = card.classList.contains("hide-reading") ? "병음 보기" : "병음 숨기기";
+      return;
+    }
+    if (act === "copy") {
+      const id = document.getElementById("modal").getAttribute("data-lid");
+      const lesson = byId[id];
+      if (lesson) copyText(answerPlainText(lesson), mact);
+      return;
+    }
+  }
+  const dt = ev.target.closest("button.day-topic[data-lid]");
+  if (dt) { openLesson(dt.getAttribute("data-lid")); return; }
+});
+
+/* ---------- 4. 게임 ---------- */
+const game = { lang: "all", scope: "all", mode: "quiz" };
+let session = null;
+
+function joinTokens(lang, tokens) {
+  return lang === "en" ? tokens.join(" ") : tokens.join("");
+}
+function collapse(s) {
+  return String(s == null ? "" : s).replace(/\s+/g, " ").trim();
+}
+function sameSentence(lang, tokens, answer) {
+  if (lang === "en") return collapse(tokens.join(" ")) === collapse(answer);
+  return tokens.join("").replace(/\s/g, "") === String(answer).replace(/\s/g, "");
+}
+
+/* 문제 만들기 */
+function exprPool() {
+  let pool = ALL_EXPRS.filter(function (it) {
+    return it.expr && it.expr.text && it.expr.ko;
+  });
+  if (game.lang !== "all") pool = pool.filter(function (it) { return it.lesson.lang === game.lang; });
+  const seen = {};
+  pool = pool.filter(function (it) {
+    const k = it.lesson.lang + "|" + it.expr.text;
+    if (seen[k]) return false;
+    seen[k] = 1;
+    return true;
+  });
+  let arr = shuffle(pool);
+  if (game.scope === "unmem") {
+    arr.sort(function (a, b) {
+      const ua = isMemorized(a.lesson, a.idx) ? 0 : 1;
+      const ub = isMemorized(b.lesson, b.idx) ? 0 : 1;
+      return ub - ua;
+    });
+  }
+  return arr;
+}
+
+function quizQuestions() {
+  const pool = exprPool();
+  const limited = pool.slice(0, 24);
+  return limited.map(function (it) {
+    const lang = it.lesson.lang;
+    const distractors = shuffle(pool.filter(function (x) {
+      return x.lesson.lang === lang && x.expr.text !== it.expr.text;
+    })).slice(0, 3).map(function (x) { return x.expr.text; });
+    return {
+      kind: "quiz",
+      lang: lang,
+      prompt: it.expr.ko,
+      answer: it.expr.text,
+      reading: it.expr.reading || readingFor(lang, it.expr.text),
+      options: shuffle([it.expr.text].concat(distractors)),
+      expr: it.expr,
+      lid: it.lesson.id,
+      lessonTitle: it.lesson.title,
+      date: it.lesson.date
+    };
+  });
+}
+
+function practicePool() {
+  let pool = PRACTICE.slice();
+  if (game.lang !== "all") pool = pool.filter(function (p) { return p.lang === game.lang; });
+  if (game.scope === "unmem") {
+    pool = shuffle(pool);
+    pool.sort(function (a, b) {
+      const la = byId[a.lid], lb = byId[b.lid];
+      const ua = la ? (memoRate(la).pct < 100 ? 1 : 0) : 0;
+      const ub = lb ? (memoRate(lb).pct < 100 ? 1 : 0) : 0;
+      return ub - ua;
+    });
+  } else {
+    pool = shuffle(pool);
+  }
+  return pool;
+}
+
+function arrangeQuestions() {
+  return practicePool().filter(function (p) { return (p.tokens || []).length >= 3; }).slice(0, 20).map(function (p) {
+    return {
+      kind: "arrange", lang: p.lang, prompt: p.ko, answer: p.text,
+      tokens: p.tokens.slice(), token_readings: (p.token_readings || []).slice(), reading: p.reading || "", lid: p.lid, date: p.date
+    };
+  });
+}
+function speakQuestions() {
+  return practicePool().filter(function (p) { return (p.tokens || []).length >= 1; }).slice(0, 20).map(function (p) {
+    return {
+      kind: "speak", lang: p.lang, prompt: p.ko, answer: p.text,
+      tokens: p.tokens.slice(), token_readings: (p.token_readings || []).slice(), reading: p.reading || "", lid: p.lid, date: p.date
+    };
+  });
+}
+
+function newSession(mode) {
+  let questions = [];
+  if (mode === "quiz") questions = quizQuestions();
+  else if (mode === "arrange") questions = arrangeQuestions();
+  else questions = speakQuestions();
+
+  session = {
+    mode: mode,
+    questions: questions,
+    i: 0,
+    wrong: 0,
+    hints: 0,
+    solved: 0,
+    tried: 0,
+    finished: questions.length === 0,
+    st: freshState()
+  };
+  renderGame();
+}
+
+function freshState() {
+  return { answered: false, picked: null, chips: null, revealed: false, heard: "", listening: false, manual: "" };
+}
+
+function curQ() { return session ? session.questions[session.i] : null; }
+
+function qHeadHTML(q) {
+  const info = LANGS[q.lang] || { label: q.lang, flag: "" };
+  let html = '<div class="q-head">';
+  html += '<span class="q-no">문제 ' + (session.i + 1) + " / " + session.questions.length + "</span>";
+  html += '<span class="q-score">정답 <b>' + session.solved + "</b> · 오답 " + session.wrong + " · 힌트 " + session.hints + "</span>";
+  html += "</div>";
+  html += '<p class="q-lang">' + esc(info.flag + " " + info.label) + " · " + esc(q.date) + "</p>";
+  return html;
+}
+
+function actionsHTML(q, revealReady) {
+  let html = '<div class="q-actions">';
+  if (q.kind === "arrange") {
+    html += '<button class="btn primary" data-gact="check"' + (session.st.picked && session.st.picked.length ? "" : " disabled") + ">정답 확인</button>";
+  }
+  html += '<button class="btn hint" data-gact="hint">💡 힌트 보기</button>';
+  html += '<button class="btn reveal" data-gact="reveal"' + (revealReady ? "" : " disabled") + ">" +
+    (revealReady ? "답안 문장 보기" : "답안 문장 보기 (오답 " + session.st.wrongForQ() + "/3)") + "</button>";
+  if (session.st.answered || session.st.revealed) {
+    html += '<button class="btn primary" data-gact="next">다음 문제 →</button>';
+  }
+  html += "</div>";
+  return html;
+}
+
+/* st에 문제별 오답 수를 담는다 */
+function ensureQState() {
+  const st = session.st;
+  if (st.qWrong === undefined) st.qWrong = 0;
+  if (!st.wrongForQ) st.wrongForQ = function () { return Math.min(st.qWrong || 0, 3); };
+  return st;
+}
+
+function renderGame() {
+  const body = document.getElementById("gameBody");
+  if (!session) { body.innerHTML = ""; return; }
+  if (!session.questions.length) {
+    body.innerHTML = '<p class="m-empty">이 조건에서 출제할 문제가 없습니다. 언어나 범위를 바꿔 보세요.</p>';
+    return;
+  }
+  if (session.finished) {
+    const total = session.solved + session.wrong;
+    body.innerHTML =
+      '<div class="summary"><div class="big">🎉</div><h3>오늘 복습 끝!</h3>' +
+      '<p>' + esc(modeLabel(session.mode)) + " 문제 " + session.questions.length + "개를 마쳤습니다.</p>" +
+      '<div class="score">정답 ' + session.solved + " · 오답 " + session.wrong + " · 힌트 " + session.hints + "</div>" +
+      '<button class="btn primary" data-gact="restart">다시 시작</button></div>';
+    return;
+  }
+  const q = curQ();
+  ensureQState();
+  if (q.kind === "quiz") renderQuiz(q);
+  else if (q.kind === "arrange") renderArrange(q);
+  else renderSpeak(q);
+}
+
+function modeLabel(m) {
+  return m === "quiz" ? "표현 복습" : m === "arrange" ? "문장 배열" : "말하기";
+}
+
+function readingHint(lang, reading) {
+  const parts = String(reading || "").split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  const take = lang === "ja" ? 2 : 3;
+  return parts.slice(0, take).join(" ") + (parts.length > take ? "…" : "");
+}
+
+function tokHTML(text, lang, reading, act, id, cls, disabled) {
+  let html = '<button class="tok' + (cls ? " " + cls : "") + '" data-gact="' + esc(act) + '" data-id="' + id + '"' + (disabled ? " disabled" : "") + ">";
+  html += '<span class="tok-body"><span class="tok-t">' + esc(text) + "</span>";
+  if (reading) html += '<span class="tok-r">' + esc(reading) + "</span>";
+  html += "</span>";
+  html += ttsBtn(text, lang, "tiny", true);
+  html += "</button>";
+  return html;
+}
+
+function hintFor(q) {
+  if (q.kind === "quiz") {
+    const t = String(q.answer || "");
+    if (q.lang === "en") {
+      const first = t.split(/\s+/)[0] || "";
+      return "첫 단어: “" + esc(first) + "” · 모두 " + t.split(/\s+/).length + "단어";
+    }
+    let h = "첫 부분: “" + esc(String(t).slice(0, 1)) + "”로 시작합니다 · 모두 " + String(t).replace(/\s/g, "").length + "글자";
+    if (q.expr && q.expr.reading) h += "<br>발음 힌트: " + esc(readingHint(q.lang, q.expr.reading));
+    return h;
+  }
+  const tokens = q.tokens || [];
+  const first = tokens[0] || "";
+  let h = "첫 어절: “" + esc(first) + "” · 모두 " + tokens.length + "개 어절";
+  if (q.reading) h += "<br>발음 힌트: " + esc(readingHint(q.lang, q.reading));
+  return h;
+}
+
+function answerBoxHTML(q) {
+  let html = '<div class="answerbox show">';
+  html += '<div class="ab-label">답안 문장</div>';
+  html += '<div class="ab-row"><div class="ab-text">' + esc(q.answer) + "</div><span class=\"ab-listen\">" + ttsBtn(q.answer, q.lang) + "</span></div>";
+  if (q.reading) html += '<div class="ab-reading">' + (q.lang === "ja" ? '<span class="rl">한국어 발음</span>' : "") + esc((q.lang === "zh" ? "병음 " : "") + q.reading) + "</div>";
+  if (q.kind === "quiz" && q.expr) {
+    if (q.expr.ko) html += '<div class="ab-ko">→ ' + esc(q.expr.ko) + "</div>";
+    if (q.expr.wrong) html += '<div class="ab-note">✗ ' + esc(q.expr.wrong) + "</div>";
+    if (q.expr.note) html += '<div class="ab-note">메모: ' + esc(q.expr.note) + "</div>";
+  } else {
+    html += '<div class="ab-ko">→ ' + esc(q.prompt) + "</div>";
+  }
+  html += "</div>";
+  return html;
+}
+
+/* ① 표현 복습 퀴즈 */
+function renderQuiz(q) {
+  const st = session.st;
+  const info = LANGS[q.lang] || { label: q.lang };
+  const typeInfo = (q.expr && TYPES[q.expr.type]) || { label: "표현" };
+  let html = qHeadHTML(q);
+  html += '<p class="q-prompt">' + esc(q.prompt) + "</p>";
+  html += '<p class="q-sub">' + esc(typeInfo.label) + " · 알맞은 " + esc(info.label) + " 표현을 고르세요.</p>";
+  html += '<div class="opts">';
+  q.options.forEach(function (opt, i) {
+    let cls = "opt";
+    let dis = "";
+    if (st.answered || st.revealed) {
+      cls += " locked";
+      if (opt === q.answer) cls += " correct";
+      else if (st.pickedText === opt) cls += " wrong";
+    }
+    html += '<button class="' + cls + '" data-gact="opt" data-opt="' + esc(opt) + '"' + dis + ">";
+    html += '<span class="k">' + String.fromCharCode(65 + i) + "</span>";
+    html += '<span class="opt-body"><span class="opt-t">' + esc(opt) + "</span>";
+    if (q.lang === "ja") {
+      const optReading = readingFor(q.lang, opt);
+      if (optReading) html += '<span class="opt-r">' + esc(optReading) + "</span>";
+    }
+    html += "</span>";
+    html += ttsBtn(opt, q.lang, "sm", true);
+    html += "</button>";
+  });
+  html += "</div>";
+
+  html += actionsHTML(q, st.qWrong >= 3);
+  html += '<div class="hintbox' + (st.hintShown ? " show" : "") + '">' +
+    (st.hintShown ? hintFor(q) + '<div class="hint-listen">' + ttsBtn(q.answer, q.lang, "sm", false, "정답 문장 듣기") + "</div>" : "") + "</div>";
+  if (st.revealed) html += answerBoxHTML(q);
+  if (st.msg) html += '<div class="feedback show ' + (st.msgKind || "info") + '">' + esc(st.msg) + "</div>";
+  document.getElementById("gameBody").innerHTML = html;
+}
+
+/* ② 문장 배열 */
+function renderArrange(q) {
+  const st = session.st;
+  if (!st.chips) {
+    st.chips = shuffle(q.tokens.map(function (t, i) { return { id: i, t: t }; }));
+    st.picked = [];
+  }
+  let html = qHeadHTML(q);
+  html += '<p class="q-prompt">' + esc(q.prompt) + "</p>";
+  html += '<p class="q-sub">어절을 차례로 눌러 ' + esc((LANGS[q.lang] || {}).label || "") + " 문장을 완성하세요. 놓은 어절을 누르면 되돌아갑니다.</p>";
+
+  const tokenReading = function (id) {
+    return (q.token_readings && q.token_readings[id]) || "";
+  };
+  html += '<div class="answer-line' + (st.picked.length ? " filled" : "") + '">';
+  if (!st.picked.length) html += '<span class="ph">여기에 어절이 차례로 놓입니다.</span>';
+  st.picked.forEach(function (id) {
+    html += tokHTML(q.tokens[id], q.lang, tokenReading(id), "unpick", id, "in", false);
+  });
+  html += "</div>";
+
+  html += '<div class="pool">';
+  st.chips.forEach(function (c) {
+    const used = st.picked.indexOf(c.id) !== -1;
+    html += tokHTML(c.t, q.lang, tokenReading(c.id), "pick", c.id, used ? "used" : "", used);
+  });
+  html += "</div>";
+
+  html += actionsHTML(q, st.qWrong >= 3);
+  html += '<div class="hintbox' + (st.hintShown ? " show" : "") + '">' +
+    (st.hintShown ? hintFor(q) + '<div class="hint-listen">' + ttsBtn(q.answer, q.lang, "sm", false, "정답 문장 듣기") + "</div>" : "") + "</div>";
+  if (st.revealed) html += answerBoxHTML(q);
+  if (st.msg) html += '<div class="feedback show ' + (st.msgKind || "info") + '">' + esc(st.msg) + "</div>";
+  document.getElementById("gameBody").innerHTML = html;
+}
+
+/* ③ 말하기 */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let recog = null;
+
+function katakanaToHiragana(s) {
+  return s.replace(/[\u30a1-\u30f6]/g, function (ch) {
+    return String.fromCharCode(ch.charCodeAt(0) - 0x60);
+  });
+}
+function normSpeech(s, lang) {
+  let v = String(s == null ? "" : s).normalize("NFKC").toLowerCase();
+  if (lang === "ja") v = katakanaToHiragana(v);
+  v = v.replace(/[\s\u3000]/g, "");
+  v = v.replace(/[.,!?;:'"“”‘’…·、。！？；：，、\-—_~()\[\]{}]/g, "");
+  return v;
+}
+function similarity(a, b) {
+  if (a === b) return 1;
+  if (!a.length || !b.length) return 0;
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > Math.max(4, Math.floor(Math.max(m, n) * 0.6))) return 0;
+  const prev = new Array(n + 1);
+  const cur = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j <= n; j++) prev[j] = cur[j];
+  }
+  return 1 - prev[n] / Math.max(m, n);
+}
+
+function speak(text, lang) {
+  try {
+    if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === "undefined") return false;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = (LANGS[lang] || {}).code || "en-US";
+    u.rate = 0.92;
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch (e) { return false; }
+}
+
+function judgeSpeak(q, heard) {
+  const target = normSpeech(q.answer, q.lang);
+  const said = normSpeech(heard, q.lang);
+  if (!said) return { ok: false, ratio: 0, msg: "잘 들리지 않았어요. 마이크에 조금 더 가까이에서 다시 말해 보세요." };
+  if (said === target) return { ok: true, ratio: 1, msg: "정확해요! 아주 잘 말했어요. 🎉" };
+  const r = similarity(said, target);
+  if (r >= 0.82) return { ok: true, ratio: r, msg: "거의 똑같이 말했어요 (" + Math.round(r * 100) + "%). 통과!" };
+  return { ok: false, ratio: r, msg: "조금 달랐어요 (" + Math.round(r * 100) + "% 일치). 다시 한 번 말해 보세요." };
+}
+
+function renderSpeak(q) {
+  const st = session.st;
+  let html = qHeadHTML(q);
+  html += '<p class="q-prompt">' + esc(q.prompt) + "</p>";
+  html += '<p class="q-sub">한국어를 보고 ' + esc((LANGS[q.lang] || {}).label || "") + "로 말해 보세요.</p>";
+
+  const isLocalFile = location.protocol === "file:" || location.protocol === "content:";
+  if (!SR) {
+    html += '<div class="warnbox show">🎙️ 이 브라우저에서는 음성 인식을 쓸 수 없습니다(인앱 뷰어·일부 모바일 브라우저). 아래에 직접 입력해 채점하거나, <b>발음 듣기</b>로 원어민 발음을 들으며 연습하세요.</div>';
+  } else if (isLocalFile) {
+    html += '<div class="warnbox show">🎙️ 폰에서 다운받은 파일(<code>' + esc(location.protocol) + '</code>)로 열면 안드로이드 보안상 마이크가 차단될 수 있어요. 웹 주소(https)로 열거나 PC 크롬에서 사용하면 음성이 인식됩니다.</div>';
+  }
+
+  html += '<div class="mic-row">';
+  html += '<button class="btn mic" data-gact="mic"' + (SR ? "" : " disabled") + ">🎤 " + (st.listening ? "듣는 중…" : "말하기") + "</button>";
+  html += '<button class="btn" type="button" data-tts="' + esc(q.answer) + '" data-ttsl="' + esc(q.lang) + '"><span class="ic">🔊</span> 발음 듣기</button>';
+  html += '<button class="btn hint" data-gact="hint">💡 힌트 보기</button>';
+  html += "</div>";
+
+  if (st.heard) {
+    html += '<div class="heard show">인식된 문장: <b>' + esc(st.heard) + "</b></div>";
+  }
+
+  html += '<div class="manual">';
+  html += '<input type="text" id="manualInput" placeholder="직접 입력해 채점 (음성 인식이 안 될 때)" value="' + esc(st.manual || "") + '" aria-label="직접 입력">';
+  html += '<button class="btn" data-gact="manual">입력으로 채점</button>';
+  html += "</div>";
+
+  html += '<div class="q-actions" style="margin-top:12px">';
+  html += '<button class="btn reveal" data-gact="reveal"' + (st.qWrong >= 3 ? "" : " disabled") + ">" +
+    (st.qWrong >= 3 ? "답안 문장 보기" : "답안 문장 보기 (오답 " + Math.min(st.qWrong, 3) + "/3)") + "</button>";
+  if (st.answered || st.revealed) html += '<button class="btn primary" data-gact="next">다음 문제 →</button>';
+  html += "</div>";
+
+  html += '<div class="hintbox' + (st.hintShown ? " show" : "") + '">' +
+    (st.hintShown ? hintFor(q) + '<div class="hint-listen">' + ttsBtn(q.answer, q.lang, "sm", false, "정답 문장 듣기") + "</div>" : "") + "</div>";
+  if (st.revealed) html += answerBoxHTML(q);
+  if (st.msg) html += '<div class="feedback show ' + (st.msgKind || "info") + '">' + esc(st.msg) + "</div>";
+  document.getElementById("gameBody").innerHTML = html;
+}
+
+/* 게임 이벤트 */
+document.getElementById("segLang").addEventListener("click", function (ev) {
+  const b = ev.target.closest("button[data-gl]");
+  if (!b) return;
+  game.lang = b.getAttribute("data-gl");
+  document.querySelectorAll("#segLang button").forEach(function (x) { x.classList.toggle("on", x === b); });
+  newSession(game.mode);
+});
+document.getElementById("segScope").addEventListener("click", function (ev) {
+  const b = ev.target.closest("button[data-gs]");
+  if (!b) return;
+  game.scope = b.getAttribute("data-gs");
+  document.querySelectorAll("#segScope button").forEach(function (x) { x.classList.toggle("on", x === b); });
+  newSession(game.mode);
+});
+document.getElementById("segMode").addEventListener("click", function (ev) {
+  const b = ev.target.closest("button[data-gm]");
+  if (!b) return;
+  game.mode = b.getAttribute("data-gm");
+  document.querySelectorAll("#segMode button").forEach(function (x) {
+    x.classList.toggle("on", x === b);
+    x.classList.toggle("mode", x === b);
+  });
+  newSession(game.mode);
+});
+
+function showMsg(kind, text) {
+  session.st.msg = text;
+  session.st.msgKind = kind;
+}
+
+function markWrong(q) {
+  session.st.qWrong = (session.st.qWrong || 0) + 1;
+  session.st.triedForQ = true;
+  session.wrong += 1;
+}
+
+document.getElementById("gameBody").addEventListener("click", function (ev) {
+  const btn = ev.target.closest("[data-gact]");
+  if (!btn || !session) return;
+  const act = btn.getAttribute("data-gact");
+  const st = session.st;
+
+  if (act === "restart") { newSession(session.mode); return; }
+  if (session.finished) return;
+  const q = curQ();
+  if (!q) return;
+
+  if (act === "opt") {
+    if (st.answered || st.revealed) return;
+    const opt = btn.getAttribute("data-opt");
+    if (opt === q.answer) {
+      st.answered = true;
+      if (!st.triedForQ) session.solved += 1;
+      if (st.triedForQ) session.solved += 0;
+      showMsg("ok", "정답이에요! 🎉 " + q.answer + (q.expr && q.expr.reading ? " (" + q.expr.reading + ")" : ""));
+    } else {
+      st.pickedText = opt;
+      markWrong(q);
+      if (st.qWrong >= 3) showMsg("no", "오답 3번 — 이제 ‘답안 문장 보기’로 정답을 확인할 수 있어요.");
+      else showMsg("no", "아쉬워요. 다시 골라 보세요. (이 문제 오답 " + st.qWrong + "/3)");
+    }
+    renderGame();
+    return;
+  }
+
+  if (act === "pick") {
+    if (st.revealed) return;
+    const id = parseInt(btn.getAttribute("data-id"), 10);
+    if (st.picked.indexOf(id) === -1) st.picked.push(id);
+    st.msg = "";
+    renderGame();
+    return;
+  }
+  if (act === "unpick") {
+    if (st.revealed) return;
+    const id = parseInt(btn.getAttribute("data-id"), 10);
+    st.picked = st.picked.filter(function (x) { return x !== id; });
+    st.msg = "";
+    renderGame();
+    return;
+  }
+  if (act === "check") {
+    if (st.revealed || st.answered) return;
+    const built = st.picked.map(function (id) { return q.tokens[id]; });
+    const ok = sameSentence(q.lang, built, q.answer);
+    if (ok) {
+      st.answered = true;
+      session.solved += 1;
+      showMsg("ok", "정답! 문장이 완성됐어요. 🎉");
+      renderGame();
+    } else {
+      markWrong(q);
+      st.msg = st.qWrong >= 3
+        ? "오답 3번 — ‘답안 문장 보기’로 정답을 확인하세요."
+        : "순서가 달라요. 놓은 어절을 눌러 다시 배열해 보세요. (오답 " + st.qWrong + "/3)";
+      st.msgKind = "no";
+      renderGame();
+    }
+    return;
+  }
+  if (act === "hint") {
+    if (!st.hintShown) { st.hintShown = true; session.hints += 1; }
+    renderGame();
+    return;
+  }
+  if (act === "reveal") {
+    if (st.qWrong < 3) return;
+    st.revealed = true;
+    st.msg = "정답 문장을 확인하고 소리 내어 읽어 보세요.";
+    st.msgKind = "info";
+    renderGame();
+    return;
+  }
+  if (act === "next") {
+    session.i += 1;
+    session.st = freshState();
+    if (session.i >= session.questions.length) session.finished = true;
+    renderGame();
+    return;
+  }
+  if (act === "tts") {
+    const ok = speak(q.answer, q.lang);
+    st.msg = ok ? "발음을 재생했어요. 따라 말해 보세요." : "이 브라우저에서는 소리 재생을 지원하지 않습니다.";
+    st.msgKind = ok ? "info" : "no";
+    renderGame();
+    return;
+  }
+  if (act === "manual") {
+    const input = document.getElementById("manualInput");
+    const val = input ? input.value : "";
+    st.manual = val;
+    if (!val.trim()) { st.msg = "비교할 문장을 입력해 주세요."; st.msgKind = "no"; renderGame(); return; }
+    const res = judgeSpeak(q, val);
+    st.heard = val;
+    if (res.ok) {
+      st.answered = true;
+      session.solved += 1;
+      st.msg = res.msg; st.msgKind = "ok";
+    } else {
+      markWrong(q);
+      st.msg = res.msg + " (오답 " + Math.min(st.qWrong, 3) + "/3)"; st.msgKind = "no";
+    }
+    renderGame();
+    return;
+  }
+  if (act === "mic") {
+    if (!SR) return;
+    if (st.listening && recog) { try { recog.stop(); } catch (e) {} return; }
+    try {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      recog = new SR();
+      recog.lang = (LANGS[q.lang] || {}).code || "en-US";
+      recog.interimResults = false;
+      recog.maxAlternatives = 3;
+      st.listening = true;
+      st.msg = "듣고 있어요. 문장을 말해 보세요…";
+      st.msgKind = "info";
+      renderGame();
+      recog.onresult = function (e) {
+        let best = "";
+        let bestRes = null;
+        try {
+          const res = e.results[e.results.length - 1];
+          const cur0 = curQ();
+          for (let k = 0; k < res.length; k++) {
+            const cand = res[k] ? res[k].transcript : "";
+            if (!cand) continue;
+            if (!cur0) { best = cand; break; }
+            const jr = judgeSpeak(cur0, cand);
+            if (!bestRes || jr.ratio > bestRes.ratio) { best = cand; bestRes = jr; }
+          }
+        } catch (err) { best = ""; }
+        const cur = curQ();
+        st.listening = false;
+        if (!cur) return;
+        st.heard = best;
+        const r = bestRes || judgeSpeak(cur, best);
+        if (r.ok) { st.answered = true; session.solved += 1; st.msg = r.msg; st.msgKind = "ok"; }
+        else { markWrong(cur); st.msg = r.msg + " (오답 " + Math.min(st.qWrong, 3) + "/3)"; st.msgKind = "no"; }
+        renderGame();
+      };
+      recog.onerror = function (e) {
+        st.listening = false;
+        const code = e && e.error ? e.error : "unknown";
+        if (code === "not-allowed" || code === "service-not-allowed") {
+          st.msg = "마이크 권한이 차단되었어요(" + code + "). 로컬 파일 대신 웹 주소(https)나 크롬 마이크 허용이 필요합니다.";
+        } else if (code === "no-speech") {
+          st.msg = "목소리가 들리지 않았어요. 마이크 버튼을 다시 누르고 바로 말해 보세요.";
+        } else {
+          st.msg = "음성 인식이 되지 않았어요 (" + code + "). 직접 입력으로 채점해 주세요.";
+        }
+        st.msgKind = "no";
+        renderGame();
+      };
+      recog.onend = function () {
+        st.listening = false;
+        const f = document.querySelector("#gameBody .btn.mic");
+        if (f) f.textContent = "🎤 말하기";
+      };
+      recog.start();
+      return;
+    } catch (err) {
+      st.listening = false;
+      st.msg = "마이크를 시작할 수 없어요. 직접 입력으로 채점해 주세요.";
+      st.msgKind = "no";
+      renderGame();
+      return;
+    }
+  }
+});
+
+/* 입력값을 다시 그릴 때 잃지 않도록 */
+document.getElementById("gameBody").addEventListener("input", function (ev) {
+  if (ev.target && ev.target.id === "manualInput" && session) session.st.manual = ev.target.value;
+});
+
+/* ---------- 시작 ---------- */
+document.querySelectorAll(".vtab").forEach(function (t) {
+  t.addEventListener("click", function () { showView(t.getAttribute("data-view")); });
+});
+
+if (!storageOk) document.getElementById("storageWarn").classList.add("show");
+initRateUI();
+updateStats();
+renderCalendar();
+renderTopics();
+renderList();
+newSession("quiz");
+</script>
+</body>
+</html>
