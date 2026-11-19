@@ -594,7 +594,7 @@
 <footer>
   <div id="footInfo"></div>
   <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
-  <div>빌드 2026-11-19 09:16</div>
+  <div>빌드 2026-11-19 09:27</div>
 </footer>
 
 <script>
@@ -1895,9 +1895,45 @@ function katakanaToHiragana(s) {
     return String.fromCharCode(ch.charCodeAt(0) - 0x60);
   });
 }
+const EN_ONES = { zero:"0", one:"1", two:"2", three:"3", four:"4", five:"5", six:"6", seven:"7", eight:"8", nine:"9",
+  ten:"10", eleven:"11", twelve:"12", thirteen:"13", fourteen:"14", fifteen:"15", sixteen:"16", seventeen:"17", eighteen:"18", nineteen:"19" };
+const EN_TENS = { twenty:20, thirty:30, forty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90 };
+const EN_UNIT = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9 };
+function normEnglishText(v) {
+  v = v.replace(/\b(i'm|i am)\b/g, "im")
+       .replace(/\b(you're|you are)\b/g, "youre")
+       .replace(/\b(they're|they are)\b/g, "theyre")
+       .replace(/\b(we're|we are)\b/g, "were")
+       .replace(/\b(it's|it is)\b/g, "its")
+       .replace(/\b(that's|that is)\b/g, "thats")
+       .replace(/\b(don't|do not)\b/g, "dont")
+       .replace(/\b(didn't|did not)\b/g, "didnt")
+       .replace(/\b(can't|cannot)\b/g, "cant")
+       .replace(/\b(won't|will not)\b/g, "wont")
+       .replace(/\b(haven't|have not)\b/g, "havent")
+       .replace(/\b(i'd|i would)\b/g, "id")
+       .replace(/\b(they'll|they will)\b/g, "theyll")
+       .replace(/\b(i'll|i will)\b/g, "ill");
+  v = v.replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)[\s-]+(one|two|three|four|five|six|seven|eight|nine)\b/g, function (_, t, o) {
+    return String(EN_TENS[t] + EN_UNIT[o]);
+  });
+  v = v.replace(/\b(twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/g, function (_, t) {
+    return String(EN_TENS[t]);
+  });
+  v = v.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)\b/g, function (_, w) {
+    return EN_ONES[w];
+  });
+  v = v.replace(/\bhundred\b/g, "100").replace(/\bthousand\b/g, "1000");
+  return v;
+}
 function normSpeech(s, lang) {
   let v = String(s == null ? "" : s).normalize("NFKC").toLowerCase();
   if (lang === "ja") v = katakanaToHiragana(v);
+  if (lang === "en") v = normEnglishText(v);
+  if (lang === "zh" || lang === "ja") {
+    const map = { "零":"0", "一":"1", "二":"2", "两":"2", "三":"3", "四":"4", "五":"5", "六":"6", "七":"7", "八":"8", "九":"9", "十":"10" };
+    v = v.replace(/[零一二两三四五六七八九十]/g, function (c) { return map[c] || c; });
+  }
   v = v.replace(/[\s\u3000]/g, "");
   v = v.replace(/[.,!?;:'"“”‘’…·、。！？；：，、\-—_~()\[\]{}]/g, "");
   return v;
