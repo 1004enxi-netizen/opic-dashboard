@@ -594,7 +594,7 @@
 <footer>
   <div id="footInfo"></div>
   <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
-  <div>빌드 2026-11-19 09:27</div>
+  <div>빌드 2026-11-19 09:35</div>
 </footer>
 
 <script>
@@ -2037,8 +2037,8 @@ function renderSpeak(q) {
     html += "</div></div>";
   }
 
-  html += '<div class="manual">';
-  html += '<input type="text" id="manualInput" placeholder="직접 입력해 채점 (음성 인식이 안 될 때)" value="' + esc(st.manual || "") + '" aria-label="직접 입력">';
+  html += '<div class="manual" style="align-items:stretch">';
+  html += '<textarea id="manualInput" rows="2" placeholder="말한 문장이 여기에 들어갑니다. 오타를 직접 고치거나 뒤에 이어서 입력해 보세요." aria-label="직접 입력 및 오타 수정" style="flex:1;min-width:200px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;line-height:1.45;resize:vertical;background:#fff;color:var(--ink)">' + esc(st.heard || st.manual || "") + "</textarea>";
   html += '<button class="btn" data-gact="manual">입력으로 채점</button>';
   html += "</div>";
 
@@ -2092,6 +2092,14 @@ function markWrong(q) {
   session.st.triedForQ = true;
   session.wrong += 1;
 }
+
+document.getElementById("gameBody").addEventListener("input", function (ev) {
+  if (!session || ev.target.id !== "manualInput") return;
+  const val = ev.target.value;
+  session.st.manual = val;
+  session.st.heard = val;
+  session.st.prevFinal = val;
+});
 
 document.getElementById("gameBody").addEventListener("click", function (ev) {
   const btn = ev.target.closest("[data-gact]");
@@ -2214,7 +2222,8 @@ document.getElementById("gameBody").addEventListener("click", function (ev) {
       chips.splice(wi, 1);
       st.heard = joinSpokenChips(chips, hadSpaces, q.lang);
       st.prevFinal = st.heard;
-      st.msg = st.heard ? "단어를 지웠어요. ‘이어서 말하기’ 또는 ‘채점하기’를 누르세요." : "모두 지워졌어요. ‘말하기 시작’을 눌러 새로 말해 보세요.";
+      st.manual = st.heard;
+      st.msg = st.heard ? "단어를 지웠어요. ‘이어서 말하기’, 아래 칸 수정, 또는 ‘채점하기’를 누르세요." : "모두 지워졌어요. ‘말하기 시작’을 눌러 새로 말해 보세요.";
       st.msgKind = "info";
       renderGame();
     }
@@ -2224,7 +2233,8 @@ document.getElementById("gameBody").addEventListener("click", function (ev) {
     st.listening = false;
     if (recog) { try { recog.stop(); } catch (e) {} }
     st.prevFinal = (st.heard || "").trim();
-    st.msg = "잠깐 멈췄어요. 틀린 단어를 눌러 지우거나 ‘이어서 말하기’를 누르세요.";
+    st.manual = st.prevFinal;
+    st.msg = "잠깐 멈췄어요. 위 단어를 눌러 지우거나 아래 입력칸에서 오타를 고치고 이어서 입력·말하기 해 보세요.";
     st.msgKind = "info";
     renderGame();
     return;
