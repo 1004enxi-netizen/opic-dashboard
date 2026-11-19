@@ -594,7 +594,7 @@
 <footer>
   <div id="footInfo"></div>
   <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
-  <div>빌드 2026-11-19 08:55</div>
+  <div>빌드 2026-11-19 09:08</div>
 </footer>
 
 <script>
@@ -2176,7 +2176,7 @@ document.getElementById("gameBody").addEventListener("click", function (ev) {
         if (!st.listening) return;
         recog = new SR();
         recog.lang = (LANGS[q.lang] || {}).code || "en-US";
-        recog.continuous = true;
+        recog.continuous = false;
         recog.interimResults = true;
         recog.maxAlternatives = 1;
         st.curSessionFinal = "";
@@ -2185,15 +2185,14 @@ document.getElementById("gameBody").addEventListener("click", function (ev) {
           let fin = "";
           let interim = "";
           try {
-            for (let i = 0; i < e.results.length; i++) {
-              const res = e.results[i];
-              const tr = res[0] ? res[0].transcript : "";
-              if (res.isFinal) fin += (fin ? " " : "") + tr;
-              else interim += (interim ? " " : "") + tr;
-            }
+            const res = e.results[e.results.length - 1];
+            const tr = res && res[0] ? res[0].transcript : "";
+            if (res && res.isFinal) fin = tr;
+            else interim = tr;
           } catch (err) {}
-          st.curSessionFinal = fin.trim();
-          st.heard = [st.prevFinal, st.curSessionFinal, interim.trim()].filter(Boolean).join(" ").trim();
+          if (fin) st.curSessionFinal = fin.trim();
+          const curPart = st.curSessionFinal || interim.trim();
+          st.heard = [st.prevFinal, curPart].filter(Boolean).join(" ").trim();
           const box = document.getElementById("speakHeardBox");
           if (box) {
             box.innerHTML = "🎙️ 듣는 중… <b>" + esc(st.heard || "(말씀을 기다리고 있어요…)") + "</b>";
