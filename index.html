@@ -620,7 +620,7 @@
 <footer>
   <div id="footInfo"></div>
   <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
-  <div>빌드 2026-11-20 06:31</div>
+  <div>빌드 2026-11-20 06:48</div>
 </footer>
 
 <script>
@@ -1699,14 +1699,28 @@ function exprPool() {
   return arr;
 }
 
+function normQuizText(s) {
+  return String(s || "").replace(/[\s.,!?。、！？「」『』()（）~〜…·]/g, "").toLowerCase();
+}
+
 function quizQuestions() {
   const pool = exprPool();
   const limited = pool.slice(0, 24);
   return limited.map(function (it) {
     const lang = it.lesson.lang;
-    const distractors = shuffle(pool.filter(function (x) {
-      return x.lesson.lang === lang && x.expr.text !== it.expr.text;
-    })).slice(0, 3).map(function (x) { return x.expr.text; });
+    const ansNorm = normQuizText(it.expr.text);
+    const seen = {};
+    seen[ansNorm] = true;
+    const distractors = [];
+    const cands = shuffle(pool.filter(function (x) {
+      return x.lesson.lang === lang && normQuizText(x.expr.text) !== ansNorm;
+    }));
+    for (let i = 0; i < cands.length && distractors.length < 3; i++) {
+      const k = normQuizText(cands[i].expr.text);
+      if (seen[k]) continue;
+      seen[k] = true;
+      distractors.push(cands[i].expr.text);
+    }
     return {
       kind: "quiz",
       lang: lang,
