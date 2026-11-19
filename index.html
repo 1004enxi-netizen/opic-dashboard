@@ -445,7 +445,7 @@
       <div class="stat"><div class="num" id="s-en">0</div><div class="lbl">영어</div></div>
       <div class="stat"><div class="num" id="s-zh">0</div><div class="lbl">중국어</div></div>
       <div class="stat"><div class="num" id="s-ja">0</div><div class="lbl">일본어</div></div>
-      <div class="stat"><div class="num" id="s-expr">0</div><div class="lbl">외울 표현</div></div>
+      <div class="stat" id="statExprBtn" role="button" tabindex="0" style="cursor:pointer" title="눌러서 외울 표현 목록 보기"><div class="num" id="s-expr">0</div><div class="lbl">외울 표현 ▸</div></div>
       <div class="stat"><div class="num" id="s-done">0</div><div class="lbl">암기 완료</div></div>
     </div>
     <div class="overall">
@@ -459,6 +459,7 @@
   <div class="viewnav-inner" role="tablist" aria-label="보기 선택">
     <button class="vtab active" data-view="calendar" role="tab" aria-selected="true">📅 한 달 달력</button>
     <button class="vtab" data-view="topics" role="tab" aria-selected="false">🗂️ 주제 누적 <span class="cnt" id="v-topic-count">0</span></button>
+    <button class="vtab" data-view="exprs" role="tab" aria-selected="false">📝 외울 표현 <span class="cnt" id="v-expr-count">0</span></button>
     <button class="vtab" data-view="list" role="tab" aria-selected="false">📚 수업 목록 <span class="cnt" id="v-lesson-count">0</span></button>
     <button class="vtab" data-view="game" role="tab" aria-selected="false">🎮 복습 게임</button>
   </div>
@@ -515,7 +516,32 @@
     </div>
   </section>
 
-  <!-- 3. 수업 목록 -->
+  <!-- 3. 외울 표현 모아보기 -->
+  <section class="view" id="view-exprs" role="tabpanel" aria-label="외울 표현">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>📝 외울 표현 리스트</h2>
+          <p id="exprsSummary">외운 표현에 체크하면 목록에서 바로 지워집니다.</p>
+        </div>
+        <label class="switch"><input type="checkbox" id="exprHideDone" checked><span>외운 표현 숨기기</span></label>
+      </div>
+      <div class="toolbar" style="margin-bottom:14px">
+        <div class="tabs" id="exprLangTabs" role="group" aria-label="언어 필터">
+          <button class="tab active" data-el="all">전체</button>
+          <button class="tab" data-el="en">🇺🇸 영어</button>
+          <button class="tab" data-el="zh">🇨🇳 중국어</button>
+          <button class="tab" data-el="ja">🇯🇵 일본어</button>
+        </div>
+        <div class="search" style="flex:1;min-width:180px">
+          <input type="search" id="exprSearch" placeholder="표현, 뜻, 발음으로 검색…" aria-label="외울 표현 검색">
+        </div>
+      </div>
+      <div id="exprsList"></div>
+    </div>
+  </section>
+
+  <!-- 4. 수업 목록 -->
   <section class="view" id="view-list" role="tabpanel" aria-label="수업 목록">
     <div class="listbar">
       <div class="tabs" role="tablist" aria-label="언어 선택">
@@ -594,7 +620,7 @@
 <footer>
   <div id="footInfo"></div>
   <div>새 수업을 추가하려면 <b>opic-dashboard/lessons.json</b> 에 1건을 더하고 <b>python opic-dashboard/build_dashboard.py</b> 를 실행하세요.</div>
-  <div>빌드 2026-11-19 09:35</div>
+  <div>빌드 2026-11-19 10:28</div>
 </footer>
 
 <script>
@@ -967,6 +993,8 @@ function updateStats() {
   document.getElementById("c-ja").textContent = counts.ja;
   document.getElementById("v-lesson-count").textContent = lessons.length;
   document.getElementById("v-topic-count").textContent = topicCount;
+  const vExpr = document.getElementById("v-expr-count");
+  if (vExpr) vExpr.textContent = Math.max(0, total - done);
 
   const last = lessons.length ? lessons[0].date : "";
   document.getElementById("footInfo").textContent =
@@ -975,7 +1003,7 @@ function updateStats() {
 }
 
 /* ---------- 뷰 전환 ---------- */
-const state = { view: "calendar", listLang: "all", q: "", onlyUnmem: false };
+const state = { view: "calendar", listLang: "all", q: "", onlyUnmem: false, exprLang: "all", exprQ: "", exprHideDone: true };
 
 function showView(name) {
   state.view = name;
@@ -989,8 +1017,61 @@ function showView(name) {
   });
   if (name === "calendar") renderCalendar();
   if (name === "topics") renderTopics();
+  if (name === "exprs") renderExprs();
   if (name === "list") renderList();
   if (name === "game" && !session) newSession(game.mode);
+}
+
+function renderExprs() {
+  const host = document.getElementById("exprsList");
+  const sum = document.getElementById("exprsSummary");
+  if (!host) return;
+  const rows = [];
+  let totalAll = 0, doneAll = 0;
+  lessons.forEach(function (l) {
+    if (state.exprLang !== "all" && l.lang !== state.exprLang) return;
+    (l.expressions || []).forEach(function (e, i) {
+      totalAll += 1;
+      const done = isMemorized(l, i);
+      if (done) doneAll += 1;
+      if (state.exprHideDone && done) return;
+      if (state.exprQ) {
+        const hay = ((e.text || "") + " " + (e.reading || "") + " " + (e.pinyin || "") + " " + (e.ko || "") + " " + (l.topics || []).join(" ")).toLowerCase();
+        if (hay.indexOf(state.exprQ.toLowerCase()) === -1) return;
+      }
+      rows.push({ lesson: l, expr: e, idx: i, done: done });
+    });
+  });
+  if (sum) {
+    sum.textContent = "남은 표현 " + (totalAll - doneAll) + "개 / 전체 " + totalAll + "개 (체크하면 목록에서 바로 지워집니다)";
+  }
+  if (!rows.length) {
+    host.innerHTML = '<div class="empty"><div class="big">' + (totalAll > 0 && totalAll === doneAll ? "🎉" : "🔎") + '</div><p>' +
+      (totalAll > 0 && totalAll === doneAll ? "이 조건의 표현을 모두 외웠어요! ‘외운 표현 숨기기’를 끄면 다시 볼 수 있습니다." : "조건에 맞는 표현이 없습니다.") + "</p></div>";
+    return;
+  }
+  let html = '<div style="display:flex;flex-direction:column;gap:8px">';
+  rows.forEach(function (r) {
+    const l = r.lesson, e = r.expr, lm = LANGS[l.lang] || { label: l.lang, cls: "" };
+    const pron = l.lang === "ja" ? (e.reading || readingFor("ja", e.text) || "") : (e.pinyin || "");
+    const key = ekey(l, r.idx);
+    html += '<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 13px;border:1px solid var(--line);border-radius:12px;background:' + (r.done ? "#f8fafc" : "#fff") + '">';
+    html += '<input type="checkbox" class="expr-chk" data-ekey="' + esc(key) + '"' + (r.done ? " checked" : "") + ' aria-label="외움 체크" style="width:20px;height:20px;margin-top:3px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:4px">';
+    html += '<span class="pill ' + esc(l.lang) + '">' + esc(lm.label) + '</span>';
+    html += '<span style="font-size:12px;color:var(--muted)">' + esc(l.date) + ' · ' + esc((l.topics || [])[0] || "") + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">';
+    html += '<span class="tts-line" data-tts="' + esc(e.text) + '" data-ttsl="' + esc(l.lang) + '" style="font-size:16px;font-weight:700;cursor:pointer' + (r.done ? ";text-decoration:line-through;opacity:.6" : "") + '">' + esc(e.text) + '</span>';
+    html += ttsBtn(e.text, l.lang, "sm", false, "발음 듣기");
+    html += '</div>';
+    if (pron) html += '<div style="font-size:13px;color:var(--accent);margin-top:2px">' + esc(pron) + '</div>';
+    html += '<div style="font-size:14px;color:#374151;margin-top:3px">' + esc(e.ko || "") + '</div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+  host.innerHTML = html;
 }
 
 /* ---------- 모달 ---------- */
@@ -2366,6 +2447,40 @@ document.getElementById("gameBody").addEventListener("input", function (ev) {
 document.querySelectorAll(".vtab").forEach(function (t) {
   t.addEventListener("click", function () { showView(t.getAttribute("data-view")); });
 });
+const statExprBtn = document.getElementById("statExprBtn");
+if (statExprBtn) {
+  statExprBtn.addEventListener("click", function () { showView("exprs"); });
+  statExprBtn.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showView("exprs"); }
+  });
+}
+const exprLangTabs = document.getElementById("exprLangTabs");
+if (exprLangTabs) {
+  exprLangTabs.addEventListener("click", function (ev) {
+    const b = ev.target.closest("button[data-el]");
+    if (!b) return;
+    state.exprLang = b.getAttribute("data-el");
+    exprLangTabs.querySelectorAll("button").forEach(function (x) { x.classList.toggle("active", x === b); });
+    renderExprs();
+  });
+}
+const exprSearch = document.getElementById("exprSearch");
+if (exprSearch) exprSearch.addEventListener("input", function () { state.exprQ = exprSearch.value.trim(); renderExprs(); });
+const exprHideDone = document.getElementById("exprHideDone");
+if (exprHideDone) exprHideDone.addEventListener("change", function () { state.exprHideDone = exprHideDone.checked; renderExprs(); });
+const exprsListEl = document.getElementById("exprsList");
+if (exprsListEl) {
+  exprsListEl.addEventListener("change", function (ev) {
+    const chk = ev.target.closest("input.expr-chk");
+    if (!chk) return;
+    const key = chk.getAttribute("data-ekey");
+    if (chk.checked) memo[key] = true; else delete memo[key];
+    saveMemo();
+    updateStats();
+    renderExprs();
+    renderList();
+  });
+}
 
 if (!storageOk) document.getElementById("storageWarn").classList.add("show");
 initRateUI();
